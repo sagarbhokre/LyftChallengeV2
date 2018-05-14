@@ -5,9 +5,6 @@ from io import BytesIO, StringIO
 import cv2
 import scipy.misc
 
-# TODO: Delete this import
-#from visualizeDataset import visualizeImage
-
 from seg_mobilenet import SegMobileNet
 from keras.models import load_model
 import numpy as np
@@ -15,7 +12,7 @@ import numpy as np
 n_classes = 3
 input_width = 800
 input_height = 608
-visualize = True
+visualize = False
 image_shape = (input_height, input_width)
 
 model_path = 'checkpoint/ep-046-val_loss-0.0369.hdf5'
@@ -36,11 +33,9 @@ def load_seg_model():
 
 save_count = 0
 def visualizeImage(rgb_frame, im_softmax, n_classes, render=True):
-    #image_shape = rgb_frame.shape
     im_softmax = im_softmax.reshape(image_shape[0], image_shape[1], -1)
 
     im_out = im_softmax.argmax(axis=2)
-    #import pdb; pdb.set_trace()
     #car_segmentation = (im_softmax[:,:,0] > 0.5).reshape(image_shape[0],image_shape[1],1)
     car_segmentation = np.where((im_out==0),1,0).astype('uint8').reshape(image_shape[0],image_shape[1],1)
     car_mask = np.dot(car_segmentation, np.array([[255, 0, 0, 127]]))
@@ -61,7 +56,6 @@ def visualizeImage(rgb_frame, im_softmax, n_classes, render=True):
     street_im.paste(car_mask, box=None, mask=car_mask)
     street_im.paste(ped_mask, box=None, mask=ped_mask)
 
-
     if render:
         global save_count
         #scipy.misc.imshow(street_im)
@@ -73,12 +67,9 @@ def visualizeImage(rgb_frame, im_softmax, n_classes, render=True):
 
 
 def preprocess_img(img, ordering='channels_first'):
-
     #in_image = scipy.misc.imread(image_file, mode='RGB')
     image = scipy.misc.imresize(img, image_shape)
-
     img = image / 127.5 - 1.0
-
     return img
 
 if __name__ == '__main__':
@@ -111,17 +102,9 @@ if __name__ == '__main__':
         pr_out = m.predict( np.array([X]) )[0]
         pr = pr_out.reshape((output_height, output_width, n_classes)).argmax(axis=2)
 
-        print(pr_out.shape)
-        seg_arr = np.zeros((output_height, output_width, 3) , dtype='uint8')
-
-        seg_arr[:,:,2] = (pr).astype('uint8')
-
-        #import pdb; pdb.set_trace()
-        binary_car_result = np.where((pr==0),1,0).astype('uint8')
-
-        binary_road_result = np.where(((pr == 1)),1,0).astype('uint8')
-
-        answer_key[frame] = [encode(binary_car_result), encode(binary_road_result)]
+        binary_car_result  = np.where((pr==0),1,0).astype('uint8')
+        binary_road_result = np.where((pr==1),1,0).astype('uint8')
+        answer_key[frame]  = [encode(binary_car_result), encode(binary_road_result)]
 
         if visualize:
             seg_img = visualizeImage(rgb_frame, pr_out, n_classes, render=True)
