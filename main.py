@@ -17,6 +17,9 @@ import glob
 KERAS_TRAIN = 1
 KERAS_TEST = 0
 
+# Initialization; would be updated with actual value later
+new_shape = [600,800]
+
 # Check TensorFlow Version
 assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), \
     'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(
@@ -93,8 +96,8 @@ def train_nn(
     val_loss_summary = tf.placeholder(tf.float32)
     train_iou_summary = tf.placeholder(tf.float32)
     val_iou_summary = tf.placeholder(tf.float32)
-    seg_image_summary = tf.placeholder(tf.float32, [None, 600,800,3], name = "seg_img")
-    inter_seg_image_summary = tf.placeholder(tf.float32, [None, 600,800,3], name = "inter_seg_img")
+    seg_image_summary = tf.placeholder(tf.float32, [None, new_shape[0], new_shape[1], 3], name = "seg_img")
+    inter_seg_image_summary = tf.placeholder(tf.float32, [None, new_shape[0], new_shape[1], 3], name = "inter_seg_img")
 
     tf.summary.scalar("train_loss", train_loss_summary)
     tf.summary.scalar("train_iou", train_iou_summary)
@@ -211,7 +214,7 @@ def augmentation_fn(image, label, label2, label3):
 # tests.test_train_nn(train_nn)
 def run():
     from_scratch = False
-    do_train = True
+    do_train = False
     num_classes = 3
     image_shape = (600, 800)
     learning_rate_val = 0.001
@@ -235,24 +238,26 @@ def run():
     model_files = glob.glob('checkpoint/ep-*.hdf5')
     model_files.sort(key=os.path.getmtime)
 
+    global new_shape
+    new_shape = [x // 16 * 16 for x in image_shape]
+
     with K.get_session() as sess:
         # Create function to get batches
         #train_batches_fn, val_batches_fn = helper.gen_batches_functions(
             #os.path.join(data_dir, 'data_road/training'), image_shape,
             #train_augmentation_fn=augmentation_fn)
         train_batches_fn, val_batches_fn = helper.gen_lyft_batches_functions(
-            data_dir+'/Train', image_shape, image_folder='CameraRGB', label_folder='CameraSeg',
+            data_dir+'/Train', new_shape, image_folder='CameraRGB', label_folder='CameraSeg',
             train_augmentation_fn=augmentation_fn)
 
         learning_phase = K.learning_phase()
         learning_rate = tf.placeholder(tf.float32, name='learning_rate')
         correct_label = tf.placeholder(
             tf.float32,
-            shape=[None, image_shape[0], image_shape[1], num_classes],
+            shape=[None, new_shape[0], new_shape[1], num_classes],
             name='correct_label')
 
-        model = SegMobileNet(
-            image_shape[0], image_shape[1], num_classes=num_classes)
+        model = SegMobileNet(new_shape[0], new_shape[1], num_classes=num_classes)
         # this initializes the keras variables
         sess = K.get_session()
         if not from_scratch:

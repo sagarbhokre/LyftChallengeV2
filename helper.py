@@ -115,12 +115,12 @@ def gen_lyft_batches_functions(data_folder, image_shape, image_folder='image_2',
                 in_image = scipy.misc.imread(image_file, mode='RGB')
 
                 # Remove hood area
-                in_image = in_image[:-100, :, :]
+                #in_image = in_image[:-100, :, :]
                 image = scipy.misc.imresize(in_image, image_shape, interp='nearest')
 
                 in_gt = scipy.misc.imread(gt_image_file)
                 # Remove hood area
-                in_gt = in_gt[:-100, :, :]
+                #in_gt = in_gt[:-100, :, :]
                 gt_image = scipy.misc.imresize(in_gt, image_shape, interp='nearest')[:,:,0]
 
                 gt_road = ((gt_image == road_id) | (gt_image == lane_id))
@@ -207,24 +207,36 @@ def gen_batches_functions(data_folder, image_shape, image_folder='image_2', labe
     return train_batches_fn, val_batches_fn
 
 
-def get_seg_img(sess, logits, image_pl, pimg, image_shape, learning_phase):
+def get_seg_img(sess, logits, image_pl, pimg_in, image_shape, learning_phase):
+
+    new_shape = [x // 16 * 16 for x in image_shape]
+    d = image_shape[0] - new_shape[0]
+
+    pimg = pimg_in[d:,:,:]
     im_softmax = sess.run(tf.nn.softmax(logits), {image_pl: [pimg], learning_phase: 0})
 
-    im_softmax = im_softmax.reshape(image_shape[0], image_shape[1], -1)
+    im_softmax = im_softmax.reshape(new_shape[0], new_shape[1], -1)
+    im_out = im_softmax.argmax(axis=2)
 
-    car_segmentation = (im_softmax[:,:,0] > 0.5).reshape(image_shape[0],image_shape[1],1)
+    car_segmentation = np.where((im_out==0),1,0).astype('uint8').reshape(new_shape[0],new_shape[1],1)
+    #car_segmentation = (im_softmax[:,:,0] > 0.5).reshape(new_shape[0],new_shape[1],1)
+    car_segmentation  = np.pad(car_segmentation,  ((d,0), (0,0), (0,0)), 'edge')
     car_mask = np.dot(car_segmentation, np.array([[255, 0, 0, 127]]))
     car_mask = scipy.misc.toimage(car_mask, mode="RGBA")
 
-    road_segmentation = (im_softmax[:,:,1] > 0.5).reshape(image_shape[0],image_shape[1],1)
+    road_segmentation = np.where((im_out==1),1,0).astype('uint8').reshape(new_shape[0],new_shape[1],1)
+    #road_segmentation = (im_softmax[:,:,1] > 0.5).reshape(new_shape[0],new_shape[1],1)
+    road_segmentation = np.pad(road_segmentation, ((d,0), (0,0), (0,0)), 'edge')
     road_mask = np.dot(road_segmentation, np.array([[0, 255, 0, 127]]))
     road_mask = scipy.misc.toimage(road_mask, mode="RGBA")
 
-    ped_segmentation = (im_softmax[:,:,2] > 0.5).reshape(image_shape[0],image_shape[1],1)
+    ped_segmentation = np.where((im_out==2),1,0).astype('uint8').reshape(new_shape[0],new_shape[1],1)
+    #ped_segmentation = (im_softmax[:,:,2] > 0.5).reshape(new_shape[0],new_shape[1],1)
+    ped_segmentation  = np.pad(ped_segmentation,  ((d,0), (0,0), (0,0)), 'edge')
     ped_mask = np.dot(ped_segmentation, np.array([[0, 0, 255, 127]]))
     ped_mask = scipy.misc.toimage(ped_mask, mode="RGBA")
 
-    image = (pimg + 1.0) * 127.5
+    image = (pimg_in + 1.0) * 127.5
 
     street_im = scipy.misc.toimage(image)
     street_im.paste(road_mask, box=None, mask=road_mask)

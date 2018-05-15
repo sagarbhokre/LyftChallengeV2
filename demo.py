@@ -17,12 +17,12 @@ visualize = False
 enable_profiling = False
 image_shape = (input_height, input_width)
 
-model_path = 'checkpoint/ep-048-val_loss-0.0723.hdf5'#checkpoint/ep-046-val_loss-0.0369.hdf5'
+model_path = 'checkpoint/ep-048-val_loss-0.0413.hdf5'
 
 def load_seg_model():
-    m = SegMobileNet(input_height=600, input_width=800, num_classes=n_classes)
+    new_shape = [x // 16 * 16 for x in image_shape]
+    m = SegMobileNet(input_height=new_shape[0], input_width=new_shape[1], num_classes=n_classes)
     m.load_weights(model_path)
-    #m = load_model(model_path)
     m.compile(loss='categorical_crossentropy',
               optimizer= 'adadelta' ,
               metrics=['accuracy'])
@@ -35,10 +35,9 @@ def load_seg_model():
     return m, output_width, output_height
 
 save_count = 0
-def visualizeImage(rgb_frame, im_softmax, n_classes, render=True):
-    im_softmax = im_softmax.reshape(image_shape[0], image_shape[1], -1)
+def visualizeImage(rgb_frame, im_out, n_classes, render=True):
+    image_shape = rgb_frame.shape[:2]
 
-    im_out = im_softmax.argmax(axis=2)
     #car_segmentation = (im_softmax[:,:,0] > 0.5).reshape(image_shape[0],image_shape[1],1)
     car_segmentation = np.where((im_out==0),1,0).astype('uint8').reshape(image_shape[0],image_shape[1],1)
     car_mask = np.dot(car_segmentation, np.array([[255, 0, 0, 127]]))
@@ -100,19 +99,21 @@ if __name__ == '__main__':
     start_t = time.time()
 
     for rgb_frame in video:
+        d = int(rgb_frame.shape[0] - output_height)
+
         frame_shape = rgb_frame.shape
-        X = preprocess_img(rgb_frame)
+        X = preprocess_img(rgb_frame[d:,:,:])
 
         pr_out = m.predict( np.array([X]) )[0]
         pr = pr_out.reshape((output_height, output_width, n_classes)).argmax(axis=2)
-        #pr = scipy.misc.imresize(pr, frame_shape)
+        pr = np.pad(pr, ((d,0), (0,0)), 'edge')
 
         binary_car_result  = np.where((pr==0),1,0).astype('uint8')
         binary_road_result = np.where((pr==1),1,0).astype('uint8')
         answer_key[frame]  = [encode(binary_car_result), encode(binary_road_result)]
 
         if visualize:
-            seg_img = visualizeImage(rgb_frame, pr_out, n_classes, render=True)
+            seg_img = visualizeImage(rgb_frame, pr, n_classes, render=True)
 
         # Increment frame
         frame+=1
