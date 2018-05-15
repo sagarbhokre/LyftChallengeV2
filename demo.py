@@ -17,7 +17,7 @@ visualize = False
 enable_profiling = False
 image_shape = (input_height, input_width)
 
-model_path = 'checkpoint/ep-048-val_loss-0.0413.hdf5'
+model_path = 'checkpoint/ep-020-val_loss-0.0553.hdf5'
 
 def load_seg_model():
     new_shape = [x // 16 * 16 for x in image_shape]

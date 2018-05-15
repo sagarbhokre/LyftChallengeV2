@@ -73,9 +73,9 @@ def SegMobileNet(input_height, input_width, num_classes=21):
     Upsample_s2 = Lambda(
         lambda x: _resize_bilinear(x, input_height // 2, input_width // 2))
     x_up2 = Upsample_s2(x_s4)
-    # x_s2 = _conv_bn_pred(x_s2, 2, num_classes=num_classes)
-    # x_s2 = Add(name='add_s2')([x_up2, x_s2])
-    x_s2 = x_up2
+    x_s2 = _conv_bn_pred(x_s2, 2, num_classes=num_classes)
+    x_s2 = Add(name='add_s2')([x_up2, x_s2])
+    #x_s2 = x_up2
     Upsample_s1 = Lambda(
         lambda x: _resize_bilinear(x, input_height // 1, input_width // 1))
     x = Upsample_s1(x_s2)

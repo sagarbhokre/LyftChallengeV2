@@ -73,7 +73,7 @@ def maybe_download_mobilenet_weights(alpha_text='1_0', rows=224):
                            cache_subdir='models')
     return weight_path
 
-def gen_lyft_batches_functions(data_folder, image_shape, image_folder='image_2', label_folder='gt_image_2',
+def gen_lyft_batches_functions(data_folders, image_shape, image_folder='image_2', label_folder='gt_image_2',
                                train_augmentation_fn=None,
                                val_augmentation_fn=None):
     """
@@ -82,11 +82,17 @@ def gen_lyft_batches_functions(data_folder, image_shape, image_folder='image_2',
     :param image_shape: Tuple - Shape of image
     :return:
     """
-    image_paths = sorted(
-        glob(os.path.join(data_folder, image_folder, '*.png')))[:]
+    image_paths = []
+    label_fns = []
+    for data_folder in data_folders:
+        image_paths.extend(sorted(glob(os.path.join(data_folder, image_folder, '*.png')))[:])
+        label_fns.extend(glob(os.path.join(data_folder, label_folder, '*.png')))
+
     #image_paths = image_paths[:16]
     train_paths, val_paths = train_test_split(
         image_paths, test_size=0.1, random_state=21)
+
+    label_paths = {os.path.basename(path): path for path in label_fns}
 
     def get_batches_fn(batch_size, image_paths, augmentation_fn=None):
         """
@@ -94,12 +100,6 @@ def gen_lyft_batches_functions(data_folder, image_shape, image_folder='image_2',
         :param batch_size: Batch Size
         :return: Batches of training data
         """
-        label_fns = glob(os.path.join(
-            data_folder, label_folder, '*.png'))
-        label_paths = {
-            os.path.basename(path): path
-            for path in label_fns}
-
         background_color = np.array([0, 0, 0])
         pedestrian_id = 4
         road_id = 7

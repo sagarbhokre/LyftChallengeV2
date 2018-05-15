@@ -16,6 +16,7 @@ import glob
 # https://keras.io/backend/
 KERAS_TRAIN = 1
 KERAS_TEST = 0
+use_ce_loss = True
 
 # Initialization; would be updated with actual value later
 new_shape = [600,800]
@@ -45,8 +46,16 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     """
     logits = tf.reshape(nn_last_layer, (-1, num_classes))
     correct_label = tf.reshape(correct_label, (-1, num_classes))
-    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-        labels=correct_label, logits=logits))
+
+    if use_ce_loss:
+        loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=correct_label, logits=logits))
+    else:
+        inter=tf.reduce_sum(tf.mul(logits,correct_labels))
+        union=tf.reduce_sum(tf.sub(tf.add(logits,correct_labels),tf.mul(logits,correct_labels)))
+        loss=tf.sub(tf.constant(1.0, dtype=tf.float32),tf.div(inter,union))
+        print(inter.shape, union.shape)
+        exit()
+
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
     # optimizer = tf.train.MomentumOptimizer(
     #     learning_rate=learning_rate, momentum=0.9)
@@ -214,13 +223,13 @@ def augmentation_fn(image, label, label2, label3):
 # tests.test_train_nn(train_nn)
 def run():
     from_scratch = False
-    do_train = False
+    do_train = True
     num_classes = 3
     image_shape = (600, 800)
     learning_rate_val = 0.001
-    epochs = 50
+    epochs = 20
     decay = learning_rate_val / (2 * epochs)
-    batch_size = 8
+    batch_size = 2
     data_dir = '/home/sagar/datasets/Lyft'
     runs_dir = './runs'
     #tests.test_for_kitti_dataset('./data')
@@ -247,7 +256,7 @@ def run():
             #os.path.join(data_dir, 'data_road/training'), image_shape,
             #train_augmentation_fn=augmentation_fn)
         train_batches_fn, val_batches_fn = helper.gen_lyft_batches_functions(
-            data_dir+'/Train', new_shape, image_folder='CameraRGB', label_folder='CameraSeg',
+            [data_dir+'/Train1', data_dir+'/Train'], new_shape, image_folder='CameraRGB', label_folder='CameraSeg',
             train_augmentation_fn=augmentation_fn)
 
         learning_phase = K.learning_phase()
