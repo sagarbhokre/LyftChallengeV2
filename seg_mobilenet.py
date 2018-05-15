@@ -18,8 +18,8 @@ import tensorflow as tf
 
 
 def TruncatedMobileNet(input_height, input_width):
-    assert input_height // 16 * 16 == input_height
-    assert input_width // 16 * 16 == input_width
+    assert input_height // 8 * 8 == input_height
+    assert input_width // 8 * 8 == input_width
     alpha = 1.0
     depth_multiplier = 1
     img_input = Input(shape=[input_height, input_width, 3], name='image_input')
@@ -53,16 +53,20 @@ def TruncatedMobileNet(input_height, input_width):
 
 
 def SegMobileNet(input_height, input_width, num_classes=21):
-    assert input_height // 16 * 16 == input_height
-    assert input_width // 16 * 16 == input_width
+    #assert input_height // 16 * 16 == input_height
+    #assert input_width // 16 * 16 == input_width
+    assert input_height // 8 * 8 == input_height
+    assert input_width // 8 * 8 == input_width
     img_input, x_s2, x_s4, x_s8, x_s16 = TruncatedMobileNet(
         input_height, input_width)
+    '''
     x_s16 = _conv_bn_pred(x_s16, 16, num_classes=num_classes)
     Upsample_s8 = Lambda(
         lambda x: _resize_bilinear(x, input_height // 8, input_width // 8))
     x_up8 = Upsample_s8(x_s16)
+    '''
     x_s8 = _conv_bn_pred(x_s8, 8, num_classes=num_classes)
-    x_s8 = Add(name='add_s8')([x_up8, x_s8])
+    #x_s8 = Add(name='add_s8')([x_up8, x_s8])
     Upsample_s4 = Lambda(
         lambda x: _resize_bilinear(x, input_height // 4, input_width // 4))
     x_up4 = Upsample_s4(x_s8)

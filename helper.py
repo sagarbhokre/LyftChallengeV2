@@ -118,7 +118,6 @@ def gen_lyft_batches_functions(data_folder, image_shape, image_folder='image_2',
                 in_image = in_image[:-100, :, :]
                 image = scipy.misc.imresize(in_image, image_shape, interp='nearest')
 
-
                 in_gt = scipy.misc.imread(gt_image_file)
                 # Remove hood area
                 in_gt = in_gt[:-100, :, :]

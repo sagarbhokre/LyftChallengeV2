@@ -4,6 +4,7 @@ from PIL import Image
 from io import BytesIO, StringIO
 import cv2
 import scipy.misc
+import time
 
 from seg_mobilenet import SegMobileNet
 from keras.models import load_model
@@ -11,15 +12,17 @@ import numpy as np
 
 n_classes = 3
 input_width = 800
-input_height = 608
+input_height = 600
 visualize = False
+enable_profiling = False
 image_shape = (input_height, input_width)
 
-model_path = 'checkpoint/ep-046-val_loss-0.0369.hdf5'
+model_path = 'checkpoint/ep-048-val_loss-0.0723.hdf5'#checkpoint/ep-046-val_loss-0.0369.hdf5'
 
 def load_seg_model():
-    m = SegMobileNet(input_height=608, input_width=800, num_classes=n_classes)
+    m = SegMobileNet(input_height=600, input_width=800, num_classes=n_classes)
     m.load_weights(model_path)
+    #m = load_model(model_path)
     m.compile(loss='categorical_crossentropy',
               optimizer= 'adadelta' ,
               metrics=['accuracy'])
@@ -65,11 +68,10 @@ def visualizeImage(rgb_frame, im_softmax, n_classes, render=True):
         #if c == ord('q') or c == 27:
             #exit() 
 
-
 def preprocess_img(img, ordering='channels_first'):
     #in_image = scipy.misc.imread(image_file, mode='RGB')
-    image = scipy.misc.imresize(img, image_shape)
-    img = image / 127.5 - 1.0
+    #img = scipy.misc.imresize(img, image_shape)
+    img = img / 127.5 - 1.0
     return img
 
 if __name__ == '__main__':
@@ -95,12 +97,15 @@ if __name__ == '__main__':
     # Frame numbering starts at 1
     frame = 1
 
-    for rgb_frame in video:
+    start_t = time.time()
 
+    for rgb_frame in video:
+        frame_shape = rgb_frame.shape
         X = preprocess_img(rgb_frame)
 
         pr_out = m.predict( np.array([X]) )[0]
         pr = pr_out.reshape((output_height, output_width, n_classes)).argmax(axis=2)
+        #pr = scipy.misc.imresize(pr, frame_shape)
 
         binary_car_result  = np.where((pr==0),1,0).astype('uint8')
         binary_road_result = np.where((pr==1),1,0).astype('uint8')
@@ -112,5 +117,9 @@ if __name__ == '__main__':
         # Increment frame
         frame+=1
 
-    # Print output in proper json format
-    print (json.dumps(answer_key))
+    if enable_profiling:
+        fps = frame/(time.time() - start_t)
+        print("FPS: %f"%(fps))
+    else:
+        # Print output in proper json format
+        print (json.dumps(answer_key))

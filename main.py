@@ -93,8 +93,8 @@ def train_nn(
     val_loss_summary = tf.placeholder(tf.float32)
     train_iou_summary = tf.placeholder(tf.float32)
     val_iou_summary = tf.placeholder(tf.float32)
-    seg_image_summary = tf.placeholder(tf.float32, [None, 608,800,3], name = "seg_img")
-    inter_seg_image_summary = tf.placeholder(tf.float32, [None, 608,800,3], name = "inter_seg_img")
+    seg_image_summary = tf.placeholder(tf.float32, [None, 600,800,3], name = "seg_img")
+    inter_seg_image_summary = tf.placeholder(tf.float32, [None, 600,800,3], name = "inter_seg_img")
 
     tf.summary.scalar("train_loss", train_loss_summary)
     tf.summary.scalar("train_iou", train_iou_summary)
@@ -213,7 +213,7 @@ def run():
     from_scratch = False
     do_train = True
     num_classes = 3
-    image_shape = (608, 800)
+    image_shape = (600, 800)
     learning_rate_val = 0.001
     epochs = 50
     decay = learning_rate_val / (2 * epochs)
