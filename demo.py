@@ -17,7 +17,7 @@ visualize = False
 enable_profiling = False
 image_shape = (input_height, input_width)
 
-model_path = 'checkpoint/ep-028-val_loss-0.0154.hdf5'
+model_path = 'checkpoint/ep-028-val_loss-0.5057.hdf5'
 
 def load_seg_model():
     new_shape = [x // 16 * 16 for x in image_shape]
@@ -98,6 +98,8 @@ if __name__ == '__main__':
 
     start_t = time.time()
 
+    pr = np.ones((input_height, input_width))*2
+
     for rgb_frame in video:
         d = int(rgb_frame.shape[0] - int(output_height))
 
@@ -105,11 +107,15 @@ if __name__ == '__main__':
         X = preprocess_img(rgb_frame[d:,:,:])
 
         pr_out = m.predict( np.array([X]) )[0]
-        pr = pr_out.reshape((output_height, output_width, n_classes)).argmax(axis=2)
-        pr = np.pad(pr, ((d,0), (0,0)), 'edge')
 
+        pr[d:,:] = pr_out.reshape((output_height, output_width, n_classes)).argmax(axis=2)
+        #pr = pr_out.reshape((output_height, output_width, n_classes)).argmax(axis=2)
+        #pr = np.pad(pr, ((d,0), (0,0)), 'edge')
         binary_car_result  = np.where((pr==0),1,0).astype('uint8')
         binary_road_result = np.where((pr==1),1,0).astype('uint8')
+
+        #binary_car_result  = np.where((pr_out[:,:,0]>0.5),1,0).astype('uint8')
+        #binary_road_result = np.where((pr_out[:,:,1]>0.5),1,0).astype('uint8')
         answer_key[frame]  = [encode(binary_car_result), encode(binary_road_result)]
 
         if visualize:

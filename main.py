@@ -35,6 +35,12 @@ else:
     print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
 
 
+def calc_f(beta, pr, rc):
+    return ((1 + beta ** 2) * pr * rc) / (((beta ** 2) * pr) + rc)
+
+def calc_fmax(beta):
+    return (1 + beta ** 2)/(1 + beta)
+
 def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     """
     Build the TensorFLow loss and optimizer operations.
@@ -50,9 +56,31 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     if use_ce_loss:
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=correct_label, logits=logits))
     else:
-        inter=tf.reduce_sum(tf.multiply(logits,correct_label))
-        union=tf.reduce_sum(tf.subtract(tf.add(logits,correct_label),tf.multiply(logits,correct_label)))
-        loss=tf.subtract(tf.constant(1.0, dtype=tf.float32),tf.divide(inter,union))
+        logits_c = tf.unstack(logits, axis=1)
+        correct_label_c = tf.unstack(correct_label, axis=1)
+        loss = 0
+        beta_car = 2.0
+        beta_road = 0.5
+        weights = [10.0, 1.0, 0.0] # Car, Road, Background
+        F_car = 0
+        F_road = 0
+        for i in range(num_classes):
+            # Ignore background
+            if i == 2:
+                continue
+            l,c = logits_c[i], correct_label_c[i]
+            inter=tf.reduce_sum(tf.multiply(l,c))
+            union=tf.reduce_sum(tf.subtract(tf.add(l,c),tf.multiply(l,c)))
+            precision = tf.divide(inter, tf.reduce_sum(l))
+            recall = tf.divide(inter, tf.reduce_sum(c))
+            if i == 0: #Car
+                F_car = calc_f(beta_car, precision,recall)
+            if i == 1:
+                F_road = calc_f(beta_road, precision,recall)
+            #loss+=weights[i]*tf.subtract(tf.constant(1.0, dtype=tf.float32),tf.divide(inter,union))
+        #loss=tf.subtract(tf.constant(1.0, dtype=tf.float32),(F_car + F_road))
+        F_max = calc_fmax(beta_car) + calc_fmax(beta_road)
+        loss = (F_max - (F_car + F_road))
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
     # optimizer = tf.train.MomentumOptimizer(
@@ -198,7 +226,7 @@ def train_nn(
                                 inter_seg_image_summary: np.array(segmented_images)})
 
         writer.add_summary(summary_val, epoch)
-        if epoch % 2 == 0:
+        if epoch % 1 == 0:
             weight_path = 'checkpoint/ep-%03d-val_loss-%.4f.hdf5' \
                           % (epoch, val_loss)
             model.save(weight_path)
@@ -225,9 +253,9 @@ def run():
     num_classes = 3
     image_shape = (600, 800)
     learning_rate_val = 0.001
-    epochs = 20
+    epochs = 30
     decay = learning_rate_val / (2 * epochs)
-    batch_size = 2
+    batch_size = 4
     data_dir = '/home/sagar/datasets/Lyft'
     runs_dir = './runs'
     #tests.test_for_kitti_dataset('./data')
