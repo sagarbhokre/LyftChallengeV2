@@ -16,7 +16,7 @@ import glob
 # https://keras.io/backend/
 KERAS_TRAIN = 1
 KERAS_TEST = 0
-use_ce_loss = True
+use_ce_loss = False
 
 # Initialization; would be updated with actual value later
 new_shape = [600,800]
@@ -50,11 +50,9 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     if use_ce_loss:
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=correct_label, logits=logits))
     else:
-        inter=tf.reduce_sum(tf.mul(logits,correct_labels))
-        union=tf.reduce_sum(tf.sub(tf.add(logits,correct_labels),tf.mul(logits,correct_labels)))
-        loss=tf.sub(tf.constant(1.0, dtype=tf.float32),tf.div(inter,union))
-        print(inter.shape, union.shape)
-        exit()
+        inter=tf.reduce_sum(tf.multiply(logits,correct_label))
+        union=tf.reduce_sum(tf.subtract(tf.add(logits,correct_label),tf.multiply(logits,correct_label)))
+        loss=tf.subtract(tf.constant(1.0, dtype=tf.float32),tf.divide(inter,union))
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
     # optimizer = tf.train.MomentumOptimizer(

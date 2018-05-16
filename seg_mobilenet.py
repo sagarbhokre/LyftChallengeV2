@@ -79,6 +79,7 @@ def SegMobileNet(input_height, input_width, num_classes=21):
     Upsample_s1 = Lambda(
         lambda x: _resize_bilinear(x, input_height // 1, input_width // 1))
     x = Upsample_s1(x_s2)
+    x = Activation('softmax')(x)
     return Model(img_input, x, name='SegMobileNet')
 
 

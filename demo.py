@@ -17,7 +17,7 @@ visualize = False
 enable_profiling = False
 image_shape = (input_height, input_width)
 
-model_path = 'checkpoint/ep-020-val_loss-0.0553.hdf5'
+model_path = 'checkpoint/ep-018-val_loss-0.0056.hdf5'
 
 def load_seg_model():
     new_shape = [x // 16 * 16 for x in image_shape]
@@ -99,7 +99,7 @@ if __name__ == '__main__':
     start_t = time.time()
 
     for rgb_frame in video:
-        d = int(rgb_frame.shape[0] - output_height)
+        d = int(rgb_frame.shape[0] - int(output_height))
 
         frame_shape = rgb_frame.shape
         X = preprocess_img(rgb_frame[d:,:,:])
