@@ -95,8 +95,8 @@ if __name__ == '__main__':
         pr[d:,:] = pr_out.reshape((output_height, output_width, n_classes)).argmax(axis=2)
         #pr = pr_out.reshape((output_height, output_width, n_classes)).argmax(axis=2)
         #pr = np.pad(pr, ((d,0), (0,0)), 'edge')
-        binary_car_result  = np.where((pr==0),1,0).astype('uint8')
-        binary_road_result = np.where((pr==1),1,0).astype('uint8')
+        binary_car_result  = np.where((pr==1),1,0).astype('uint8')
+        binary_road_result = np.where((pr==2),1,0).astype('uint8')
 
         #binary_car_result  = np.where((pr_out[:,:,0]>0.5),1,0).astype('uint8')
         #binary_road_result = np.where((pr_out[:,:,1]>0.5),1,0).astype('uint8')
