@@ -28,7 +28,8 @@ def load_seg_model():
               optimizer= 'adadelta' ,
               metrics=['accuracy'])
 
-    nw_output_shape = m.output[0].shape
+    #nw_output_shape = m.output[0].shape
+    nw_output_shape = new_shape
 
     output_height = nw_output_shape[0]
     output_width = nw_output_shape[1]
@@ -37,12 +38,14 @@ def load_seg_model():
 
 save_count = 0
 def visualizeImage(rgb_frame, im_out, render=True):
-    street_img = helper.blend_output(rgb_frame, im_out)
+    #im_out = im_out.reshape(rgb_frame.shape[0], rgb_frame.shape[1], 1)
+    rgb_frame = scipy.misc.toimage(rgb_frame)
+    street_img = helper.blend_output(rgb_frame, im_out, (0,255,0), (255,0,0))
 
     if render:
         global save_count
-        #scipy.misc.imshow(street_im)
-        scipy.misc.imsave('dump/'+str(save_count)+'.png', street_im)
+        #scipy.misc.imshow(street_img)
+        scipy.misc.imsave('dump/'+str(save_count)+'.png', street_img)
         save_count += 1
         #c = cv2.waitKey(30) & 0x7F
         #if c == ord('q') or c == 27:
@@ -79,7 +82,7 @@ if __name__ == '__main__':
 
     start_t = time.time()
 
-    pr = np.ones((input_height, input_width))*2
+    pr = np.zeros((input_height, input_width))*2
 
     for rgb_frame in video:
         d = int(rgb_frame.shape[0] - int(output_height))
