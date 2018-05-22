@@ -15,22 +15,22 @@ def rotate(image,
     return image
 
 
-def rotate_both(image, label, label2, label3, p=0.5, ignore_label=1):
+def rotate_both(image, label_bg, label_car, label_road, p=0.5, ignore_label=1):
     if np.random.rand() > p:
-        return image, label, label2, label3
+        return image, label_bg, label_car, label_road
     h, w = image.shape[:2]
     angle = np.random.uniform(-10, 10)
     tx = np.random.uniform(-w // 128, w // 128)
     ty = np.random.uniform(-h // 128, h // 128)
     scale = np.random.uniform(0.98, 1.02)
     image = rotate(image, angle, tx, ty, scale, border_value=(127, 127, 127))
-    label = rotate(label, angle, tx, ty, scale,
+    label_bg = rotate(label_bg, angle, tx, ty, scale,
                    interpolation=cv2.INTER_NEAREST, border_value=ignore_label)
-    label2 = rotate(label2, angle, tx, ty, scale,
-                   interpolation=cv2.INTER_NEAREST, border_value=ignore_label)
-    label3 = rotate(label3, angle, tx, ty, scale,
-                   interpolation=cv2.INTER_NEAREST, border_value=ignore_label)
-    return image, label, label2, label3
+    label_car = rotate(label_car, angle, tx, ty, scale,
+                   interpolation=cv2.INTER_NEAREST, border_value=0)
+    label_road = rotate(label_road, angle, tx, ty, scale,
+                   interpolation=cv2.INTER_NEAREST, border_value=0)
+    return image, label_bg, label_car, label_road
 
 
 def flip_both(image, label, label2, label3, p=0.5):

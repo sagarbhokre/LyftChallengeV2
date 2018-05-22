@@ -16,7 +16,7 @@ import glob
 # https://keras.io/backend/
 KERAS_TRAIN = 1
 KERAS_TEST = 0
-use_ce_loss = False
+use_ce_loss = True #False
 
 # Initialization; would be updated with actual value later
 new_shape = [600,800]
@@ -61,26 +61,26 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
         loss = 0
         beta_car = 2.0
         beta_road = 0.5
-        weights = [10.0, 1.0, 0.0] # Car, Road, Background
+        weights = [0.0, 0.9, 0.1] # Background, Car, Road
         F_car = 0
         F_road = 0
         for i in range(num_classes):
             # Ignore background
-            if i == 2:
+            if i == 0:
                 continue
             l,c = logits_c[i], correct_label_c[i]
             inter=tf.reduce_sum(tf.multiply(l,c))
             union=tf.reduce_sum(tf.subtract(tf.add(l,c),tf.multiply(l,c)))
             precision = tf.divide(inter, tf.reduce_sum(l))
             recall = tf.divide(inter, tf.reduce_sum(c))
-            if i == 0: #Car
+            if i == 1: #Car
                 F_car = calc_f(beta_car, precision,recall)
-            if i == 1:
+            if i == 2:
                 F_road = calc_f(beta_road, precision,recall)
             #loss+=weights[i]*tf.subtract(tf.constant(1.0, dtype=tf.float32),tf.divide(inter,union))
         #loss=tf.subtract(tf.constant(1.0, dtype=tf.float32),(F_car + F_road))
-        F_max = calc_fmax(beta_car) + calc_fmax(beta_road)
-        loss = (F_max - (F_car + F_road))
+        F_max = weights[1]*calc_fmax(beta_car) + weights[2]*calc_fmax(beta_road)
+        loss = (F_max - (weights[1]*F_car + weights[2]*F_road))
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
     # optimizer = tf.train.MomentumOptimizer(
@@ -112,7 +112,7 @@ def train_nn(
         learning_rate, learning_rate_val, decay, learning_phase,
         iou_op, iou,
         metric_reset_ops, update_ops,
-        model):
+        model, N_train, N_val):
     """
     Train neural network and print out the loss during training.
     :param sess: TF Session
@@ -151,6 +151,7 @@ def train_nn(
     optimizer_variables = [v for v in all_vars
                            if v not in model.updates and
                            v not in model.trainable_weights]
+
     # embed()
     sess.run(metric_reset_ops)
     sess.run(tf.variables_initializer(optimizer_variables))
@@ -181,9 +182,10 @@ def train_nn(
             if iteration_counter % 20 == 0:
                 segmented_images = []
                 for i in range(len(image)):
-                    segmented_images.append(np.array(helper.get_seg_img(sess, model.output,
-                                                                        input_image, image[i], image[i].shape,
-                                                                        learning_phase)))
+                    img1 = helper.get_seg_img(sess, model.output, input_image, image[i], image[i].shape, learning_phase)
+                    arg_label = label[i].argmax(axis=2)
+                    img2 = helper.blend_output(img1, arg_label, (255,0,0), (255,255,255))
+                    segmented_images.append(np.array(img2))
                 summary_val = sess.run(inter_seg_summary, feed_dict={inter_seg_image_summary: segmented_images})
                 writer.add_summary(summary_val, int(iteration_counter))
 
@@ -241,7 +243,7 @@ def augmentation_fn(image, label, label2, label3):
     label3 = np.uint8(label3)
     image, label, label2, label3 = flip_both(image, label, label2, label3, p=0.5)
     image, label, label2, label3 = rotate_both(image, label, label2, label3, p=0.5, ignore_label=1)
-    image, label, label2, label3 = blur_both(image, label, label2, label3, p=0.5)
+    #image, label, label2, label3 = blur_both(image, label, label2, label3, p=0.5)
     image, label, label2, label3 = illumination_change_both(image, label, label2, label3, p=0.5)
     return image, label == 1, label2 == 1, label3 == 1
 
@@ -255,8 +257,8 @@ def run():
     learning_rate_val = 0.001
     epochs = 30
     decay = learning_rate_val / (2 * epochs)
-    batch_size = 4
-    data_dir = '/home/sagar/datasets/Lyft'
+    batch_size = 8
+    data_dir = '/home/sagar/Lyft/CARLA_0.8.2/_out'
     runs_dir = './runs'
     #tests.test_for_kitti_dataset('./data')
     # OPTIONAL: Train and Inference on the cityscapes dataset instead of the
@@ -281,8 +283,8 @@ def run():
         #train_batches_fn, val_batches_fn = helper.gen_batches_functions(
             #os.path.join(data_dir, 'data_road/training'), image_shape,
             #train_augmentation_fn=augmentation_fn)
-        train_batches_fn, val_batches_fn = helper.gen_lyft_batches_functions(
-            [data_dir+'/Train1', data_dir+'/Train'], new_shape, image_folder='CameraRGB', label_folder='CameraSeg',
+        train_batches_fn, val_batches_fn, N_train, N_val = helper.gen_lyft_batches_functions(
+            data_dir, new_shape, image_folder='CameraRGB', label_folder='CameraSeg',
             train_augmentation_fn=augmentation_fn)
 
         learning_phase = K.learning_phase()
@@ -306,6 +308,7 @@ def run():
             logits, correct_label, learning_rate, num_classes)
 
         if do_train:
+            print("N_train: %d\tN_val:%d\tTrain steps: %d\tVal_steps: %d"%(N_train, N_val, int(N_train/batch_size), int(N_val/batch_size)))
             train_nn(sess, epochs, batch_size,
                      train_batches_fn, val_batches_fn,
                      train_op, loss, input_image,
@@ -313,7 +316,7 @@ def run():
                      learning_rate, learning_rate_val, decay, learning_phase,
                      iou_op, iou, metric_reset_ops,
                      update_ops,
-                     model)
+                     model, N_train, N_val)
         else:
             model.load_weights(model_files[-1])
 

@@ -4,7 +4,7 @@ from __future__ import division
 
 from keras import backend as K
 from keras.models import Model
-from keras.layers import Conv2D
+from keras.layers import Conv2D, Conv2DTranspose
 from keras.layers import BatchNormalization
 from keras.layers import Input
 from keras.layers import Lambda
@@ -55,8 +55,9 @@ def TruncatedMobileNet(input_height, input_width):
 def SegMobileNet(input_height, input_width, num_classes=21):
     assert input_height // 16 * 16 == input_height
     assert input_width // 16 * 16 == input_width
-    img_input, x_s2, x_s4, x_s8, x_s16 = TruncatedMobileNet(
-        input_height, input_width)
+    img_input, x_s2, x_s4, x_s8, x_s16 = TruncatedMobileNet(input_height, input_width)
+
+    '''
     x_s16 = _conv_bn_pred(x_s16, 16, num_classes=num_classes)
 
     Upsample_s8 = Lambda(
@@ -79,9 +80,21 @@ def SegMobileNet(input_height, input_width, num_classes=21):
     Upsample_s1 = Lambda(
         lambda x: _resize_bilinear(x, input_height // 1, input_width // 1))
     x = Upsample_s1(x_s2)
+    '''
+
+    x_up8 = Conv2DTranspose(256, (3,3), strides=(2, 2), data_format='channels_last', padding='same', name='deconv_8')(x_s16)
+    x_s8 = Add(name='add_s8')([x_up8, x_s8])
+
+    x_up4 = Conv2DTranspose(128, (3,3), strides=(2, 2), padding='same', name='deconv_4')(x_s8)
+    x_s4 = Add(name='add_s4')([x_up4, x_s4])
+
+    x_up2 = Conv2DTranspose(64, (3,3), strides=(2, 2), padding='same', name='deconv_2')(x_s4)
+    x_s2 = Add(name='add_s2')([x_up2, x_s2])
+
+    x = Conv2DTranspose(num_classes, (3,3), strides=(2, 2), padding='same', name='deconv_1')(x_s2)
+
     x = Activation('softmax')(x)
     return Model(img_input, x, name='SegMobileNet')
-
 
 def _conv_bn_pred(x, stride, num_classes=21):
     x = Conv2D(num_classes, 1, use_bias=False, padding='same',

@@ -9,15 +9,16 @@ import time
 from seg_mobilenet import SegMobileNet
 from keras.models import load_model
 import numpy as np
+import helper
 
 n_classes = 3
 input_width = 800
 input_height = 600
-visualize = False
+visualize = True
 enable_profiling = False
 image_shape = (input_height, input_width)
 
-model_path = 'checkpoint/ep-028-val_loss-0.5057.hdf5'
+model_path = 'checkpoint/ep-029-val_loss-0.5531.hdf5'
 
 def load_seg_model():
     new_shape = [x // 16 * 16 for x in image_shape]
@@ -35,28 +36,8 @@ def load_seg_model():
     return m, output_width, output_height
 
 save_count = 0
-def visualizeImage(rgb_frame, im_out, n_classes, render=True):
-    image_shape = rgb_frame.shape[:2]
-
-    #car_segmentation = (im_softmax[:,:,0] > 0.5).reshape(image_shape[0],image_shape[1],1)
-    car_segmentation = np.where((im_out==0),1,0).astype('uint8').reshape(image_shape[0],image_shape[1],1)
-    car_mask = np.dot(car_segmentation, np.array([[255, 0, 0, 127]]))
-    car_mask = scipy.misc.toimage(car_mask, mode="RGBA")
-
-    road_segmentation = np.where((im_out==1),1,0).astype('uint8').reshape(image_shape[0],image_shape[1],1)
-    road_mask = np.dot(road_segmentation, np.array([[0, 255, 0, 127]]))
-    road_mask = scipy.misc.toimage(road_mask, mode="RGBA")
-
-    ped_segmentation = np.where((im_out==2),1,0).astype('uint8').reshape(image_shape[0],image_shape[1],1)
-    ped_mask = np.dot(ped_segmentation, np.array([[0, 0, 255, 127]]))
-    ped_mask = scipy.misc.toimage(ped_mask, mode="RGBA")
-
-    #image = (rgb_frame + 1.0) * 127.5
-
-    street_im = scipy.misc.toimage(rgb_frame)
-    street_im.paste(road_mask, box=None, mask=road_mask)
-    street_im.paste(car_mask, box=None, mask=car_mask)
-    street_im.paste(ped_mask, box=None, mask=ped_mask)
+def visualizeImage(rgb_frame, im_out, render=True):
+    street_img = helper.blend_output(rgb_frame, im_out)
 
     if render:
         global save_count
@@ -119,7 +100,7 @@ if __name__ == '__main__':
         answer_key[frame]  = [encode(binary_car_result), encode(binary_road_result)]
 
         if visualize:
-            seg_img = visualizeImage(rgb_frame, pr, n_classes, render=True)
+            seg_img = visualizeImage(rgb_frame, pr, render=True)
 
         # Increment frame
         frame+=1

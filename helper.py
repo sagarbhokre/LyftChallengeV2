@@ -73,7 +73,7 @@ def maybe_download_mobilenet_weights(alpha_text='1_0', rows=224):
                            cache_subdir='models')
     return weight_path
 
-def gen_lyft_batches_functions(data_folders, image_shape, image_folder='image_2', label_folder='gt_image_2',
+def gen_lyft_batches_functions(data_folder, image_shape, image_folder='image_2', label_folder='gt_image_2',
                                train_augmentation_fn=None,
                                val_augmentation_fn=None):
     """
@@ -84,6 +84,9 @@ def gen_lyft_batches_functions(data_folders, image_shape, image_folder='image_2'
     """
     image_paths = []
     label_fns = []
+
+    data_folders = glob(data_folder+"/*/")
+
     for data_folder in data_folders:
         image_paths.extend(sorted(glob(os.path.join(data_folder, image_folder, '*.png')))[:])
         label_fns.extend(glob(os.path.join(data_folder, label_folder, '*.png')))
@@ -92,7 +95,8 @@ def gen_lyft_batches_functions(data_folders, image_shape, image_folder='image_2'
     train_paths, val_paths = train_test_split(
         image_paths, test_size=0.1, random_state=21)
 
-    label_paths = {os.path.basename(path): path for path in label_fns}
+    #label_paths = {os.path.basename(path): path for path in label_fns}
+    label_paths = {path: path for path in label_fns}
 
     def get_batches_fn(batch_size, image_paths, augmentation_fn=None):
         """
@@ -110,7 +114,7 @@ def gen_lyft_batches_functions(data_folders, image_shape, image_folder='image_2'
             images = []
             gt_images = []
             for image_file in image_paths[batch_i:batch_i + batch_size]:
-                gt_image_file = label_paths[os.path.basename(image_file)]
+                gt_image_file = label_paths[image_file.replace('CameraRGB', 'CameraSeg')]
 
                 in_image = scipy.misc.imread(image_file, mode='RGB')
 
@@ -125,18 +129,22 @@ def gen_lyft_batches_functions(data_folders, image_shape, image_folder='image_2'
 
                 gt_road = ((gt_image == road_id) | (gt_image == lane_id))
                 gt_car = (gt_image == car_id)
+                gt_car[491:,:] = False
                 gt_bg = np.invert(gt_car | gt_road)
 
-                cv2.imwrite("GT_seg_img.png", 255*gt_car)
-
                 if augmentation_fn:
-                    image, gt_car, gt_road, gt_bg = augmentation_fn(image, gt_car, gt_road, gt_bg)
+                    image, gt_bg, gt_car, gt_road = augmentation_fn(image, gt_bg, gt_car, gt_road)
+
+                if len(images) == 0:
+                    cv2.imwrite("GT_car_img.png", 255*gt_car)
+                    cv2.imwrite("GT_road_img.png", 255*gt_road)
+                    cv2.imwrite("GT_bg_img.png", 255*gt_bg)
 
                 gt_bg= gt_bg.reshape(*gt_bg.shape, 1)
                 gt_car= gt_car.reshape(*gt_car.shape, 1)
                 gt_road = gt_road.reshape(*gt_road.shape, 1)
 
-                gt_image = np.concatenate((gt_car, gt_road, gt_bg), axis=2)
+                gt_image = np.concatenate((gt_bg, gt_car, gt_road), axis=2)
 
                 images.append(image)
                 gt_images.append(gt_image)
@@ -146,7 +154,7 @@ def gen_lyft_batches_functions(data_folders, image_shape, image_folder='image_2'
     train_batches_fn = lambda batch_size: get_batches_fn(batch_size, train_paths, augmentation_fn=train_augmentation_fn)  # noqa
     val_batches_fn = lambda batch_size: get_batches_fn(batch_size, val_paths, augmentation_fn=val_augmentation_fn)  # noqa
 
-    return train_batches_fn, val_batches_fn
+    return train_batches_fn, val_batches_fn, len(train_paths), len(val_paths)
 
 
 
@@ -207,6 +215,30 @@ def gen_batches_functions(data_folder, image_shape, image_folder='image_2', labe
     return train_batches_fn, val_batches_fn
 
 
+def blend_output(frame, im_out, c, r):
+    image_shape = frame.size
+
+    #car_segmentation = (im_softmax[:,:,0] > 0.5).reshape(image_shape[0],image_shape[1],1)
+    car_segmentation = np.where((im_out==1),1,0).astype('uint8').reshape(image_shape[1],image_shape[0],1)
+    car_mask = np.dot(car_segmentation, np.array([[c[0], c[1], c[2], 127]]))
+    car_mask = scipy.misc.toimage(car_mask, mode="RGBA")
+
+    road_segmentation = np.where((im_out==2),1,0).astype('uint8').reshape(image_shape[1],image_shape[0],1)
+    road_mask = np.dot(road_segmentation, np.array([[r[0], r[1], r[2], 127]]))
+    road_mask = scipy.misc.toimage(road_mask, mode="RGBA")
+
+    #ped_segmentation = np.where((im_out==2),1,0).astype('uint8').reshape(image_shape[0],image_shape[1],1)
+    #ped_mask = np.dot(ped_segmentation, np.array([[0, 0, 255, 77]]))
+    #ped_mask = scipy.misc.toimage(ped_mask, mode="RGBA")
+
+    street_im = scipy.misc.toimage(frame)
+    street_im.paste(road_mask, box=None, mask=road_mask)
+    street_im.paste(car_mask, box=None, mask=car_mask)
+    #street_im.paste(ped_mask, box=None, mask=ped_mask)
+
+    return street_im
+
+
 def get_seg_img(sess, logits, image_pl, pimg_in, image_shape, learning_phase):
 
     new_shape = [x // 16 * 16 for x in image_shape]
@@ -218,32 +250,10 @@ def get_seg_img(sess, logits, image_pl, pimg_in, image_shape, learning_phase):
     im_softmax = im_softmax.reshape(new_shape[0], new_shape[1], -1)
     im_out = im_softmax.argmax(axis=2)
 
-    car_segmentation = np.where((im_out==0),1,0).astype('uint8').reshape(new_shape[0],new_shape[1],1)
-    #car_segmentation = (im_softmax[:,:,0] > 0.5).reshape(new_shape[0],new_shape[1],1)
-    car_segmentation  = np.pad(car_segmentation,  ((d,0), (0,0), (0,0)), 'edge')
-    car_mask = np.dot(car_segmentation, np.array([[255, 0, 0, 127]]))
-    car_mask = scipy.misc.toimage(car_mask, mode="RGBA")
-
-    road_segmentation = np.where((im_out==1),1,0).astype('uint8').reshape(new_shape[0],new_shape[1],1)
-    #road_segmentation = (im_softmax[:,:,1] > 0.5).reshape(new_shape[0],new_shape[1],1)
-    road_segmentation = np.pad(road_segmentation, ((d,0), (0,0), (0,0)), 'edge')
-    road_mask = np.dot(road_segmentation, np.array([[0, 255, 0, 127]]))
-    road_mask = scipy.misc.toimage(road_mask, mode="RGBA")
-
-    ped_segmentation = np.where((im_out==2),1,0).astype('uint8').reshape(new_shape[0],new_shape[1],1)
-    #ped_segmentation = (im_softmax[:,:,2] > 0.5).reshape(new_shape[0],new_shape[1],1)
-    ped_segmentation  = np.pad(ped_segmentation,  ((d,0), (0,0), (0,0)), 'edge')
-    ped_mask = np.dot(ped_segmentation, np.array([[0, 0, 255, 127]]))
-    ped_mask = scipy.misc.toimage(ped_mask, mode="RGBA")
-
     image = (pimg_in + 1.0) * 127.5
+    image = scipy.misc.toimage(image)
 
-    street_im = scipy.misc.toimage(image)
-    street_im.paste(road_mask, box=None, mask=road_mask)
-    street_im.paste(car_mask, box=None, mask=car_mask)
-    street_im.paste(ped_mask, box=None, mask=ped_mask)
-
-    return street_im
+    return blend_output(image, im_out, (0,255,0), (0,0,0))
 
 def gen_lyft_test_output(
         sess,
