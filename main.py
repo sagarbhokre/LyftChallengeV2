@@ -16,7 +16,10 @@ import glob
 # https://keras.io/backend/
 KERAS_TRAIN = 1
 KERAS_TEST = 0
-use_ce_loss = True #False
+use_ce_loss = False
+#use_ce_loss = True
+
+from common import *
 
 # Initialization; would be updated with actual value later
 new_shape = [600,800]
@@ -34,9 +37,12 @@ if not tf.test.gpu_device_name():
 else:
     print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
 
-
+epsilon = 1e-5
 def calc_f(beta, pr, rc):
-    return ((1 + beta ** 2) * pr * rc) / (((beta ** 2) * pr) + rc)
+
+    f_val = ((1 + beta ** 2) * pr * rc) / (epsilon + ((beta ** 2) * pr) + rc)
+
+    return f_val
 
 def calc_fmax(beta):
     return (1 + beta ** 2)/(1 + beta)
@@ -61,25 +67,27 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
         loss = 0
         beta_car = 2.0
         beta_road = 0.5
-        weights = [0.0, 0.9, 0.1] # Background, Car, Road
+        weights = [0.0, 0.7, 0.3] # Background, Car, Road
         F_car = 0
         F_road = 0
         for i in range(num_classes):
             # Ignore background
-            if i == 0:
+            if i == BG_ID:
                 continue
             l,c = logits_c[i], correct_label_c[i]
             inter=tf.reduce_sum(tf.multiply(l,c))
             union=tf.reduce_sum(tf.subtract(tf.add(l,c),tf.multiply(l,c)))
             precision = tf.divide(inter, tf.reduce_sum(l))
             recall = tf.divide(inter, tf.reduce_sum(c))
-            if i == 1: #Car
+            if i == CAR_ID:
                 F_car = calc_f(beta_car, precision,recall)
-            if i == 2:
+            if i == ROAD_ID:
                 F_road = calc_f(beta_road, precision,recall)
             #loss+=weights[i]*tf.subtract(tf.constant(1.0, dtype=tf.float32),tf.divide(inter,union))
         #loss=tf.subtract(tf.constant(1.0, dtype=tf.float32),(F_car + F_road))
         F_max = weights[1]*calc_fmax(beta_car) + weights[2]*calc_fmax(beta_road)
+        ce_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=correct_label, logits=logits))
+        #loss = (F_max - (weights[1]*F_car + weights[2]*F_road))
         loss = (F_max - (weights[1]*F_car + weights[2]*F_road))
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
@@ -161,7 +169,7 @@ def train_nn(
         except:
             print("Err ", var)
             embed()
-    epoch_pbar = tqdm(range(epochs))
+    epoch_pbar = tqdm(range(epochs), ncols=50)
     for epoch in epoch_pbar:
         # train
         train_loss = 0.0
@@ -184,7 +192,7 @@ def train_nn(
                 for i in range(len(image)):
                     img1 = helper.get_seg_img(sess, model.output, input_image, image[i], image[i].shape, learning_phase)
                     arg_label = label[i].argmax(axis=2)
-                    img2 = helper.blend_output(img1, arg_label, (255,0,0), (255,255,255))
+                    img2 = helper.blend_output(img1, arg_label, (255, 165, 0), (255,255,255))
                     segmented_images.append(np.array(img2))
                 summary_val = sess.run(inter_seg_summary, feed_dict={inter_seg_image_summary: segmented_images})
                 writer.add_summary(summary_val, int(iteration_counter))
@@ -255,7 +263,7 @@ def run():
     num_classes = 3
     image_shape = (600, 800)
     learning_rate_val = 0.001
-    epochs = 30
+    epochs = 10
     decay = learning_rate_val / (2 * epochs)
     batch_size = 8
     data_dir = '/home/sagar/Lyft/CARLA_0.8.2/_out'

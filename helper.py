@@ -15,6 +15,8 @@ from sklearn.model_selection import train_test_split
 from IPython import embed
 import cv2
 
+from common import *
+
 class DLProgress(tqdm):
     last_block = 0
 
@@ -118,14 +120,13 @@ def gen_lyft_batches_functions(data_folder, image_shape, image_folder='image_2',
 
                 in_image = scipy.misc.imread(image_file, mode='RGB')
 
-                # Remove hood area
-                #in_image = in_image[:-100, :, :]
-                image = scipy.misc.imresize(in_image, image_shape, interp='nearest')
+                #image = scipy.misc.imresize(in_image, image_shape, interp='nearest')
+                image = in_image[-image_shape[0]:, :]
 
                 in_gt = scipy.misc.imread(gt_image_file)
-                # Remove hood area
-                #in_gt = in_gt[:-100, :, :]
-                gt_image = scipy.misc.imresize(in_gt, image_shape, interp='nearest')[:,:,0]
+
+                #gt_image = scipy.misc.imresize(in_gt, image_shape, interp='nearest')[:,:,0]
+                gt_image = in_gt[-image_shape[0]:, :, 0]
 
                 gt_road = ((gt_image == road_id) | (gt_image == lane_id))
                 gt_car = (gt_image == car_id)
@@ -149,7 +150,8 @@ def gen_lyft_batches_functions(data_folder, image_shape, image_folder='image_2',
                 images.append(image)
                 gt_images.append(gt_image)
 
-            yield np.array(images) / 127.5 - 1.0, np.array(gt_images)
+            #yield np.array(images) / 127.5 - 1.0, np.array(gt_images)
+            yield np.array(images), np.array(gt_images)
 
     train_batches_fn = lambda batch_size: get_batches_fn(batch_size, train_paths, augmentation_fn=train_augmentation_fn)  # noqa
     val_batches_fn = lambda batch_size: get_batches_fn(batch_size, val_paths, augmentation_fn=val_augmentation_fn)  # noqa
@@ -219,11 +221,11 @@ def blend_output(frame, im_out, c, r):
     image_shape = frame.size
 
     #car_segmentation = (im_softmax[:,:,0] > 0.5).reshape(image_shape[0],image_shape[1],1)
-    car_segmentation = np.where((im_out==1),1,0).astype('uint8').reshape(image_shape[1],image_shape[0],1)
+    car_segmentation = np.where((im_out==CAR_ID),1,0).astype('uint8').reshape(image_shape[1],image_shape[0],1)
     car_mask = np.dot(car_segmentation, np.array([[c[0], c[1], c[2], 127]]))
     car_mask = scipy.misc.toimage(car_mask, mode="RGBA")
 
-    road_segmentation = np.where((im_out==2),1,0).astype('uint8').reshape(image_shape[1],image_shape[0],1)
+    road_segmentation = np.where((im_out==ROAD_ID),1,0).astype('uint8').reshape(image_shape[1],image_shape[0],1)
     road_mask = np.dot(road_segmentation, np.array([[r[0], r[1], r[2], 127]]))
     road_mask = scipy.misc.toimage(road_mask, mode="RGBA")
 

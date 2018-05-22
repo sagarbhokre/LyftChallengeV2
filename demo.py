@@ -10,23 +10,22 @@ from seg_mobilenet import SegMobileNet
 from keras.models import load_model
 import numpy as np
 import helper
+import keras
+import keras.applications.mobilenet as mobilenet
 
-n_classes = 3
-input_width = 800
-input_height = 600
-visualize = False
-enable_profiling = False
-image_shape = (input_height, input_width)
-
-model_path = 'checkpoint/ep-029-val_loss-0.5531.hdf5'
+from common import *
 
 def load_seg_model():
     new_shape = [x // 16 * 16 for x in image_shape]
-    m = SegMobileNet(input_height=new_shape[0], input_width=new_shape[1], num_classes=n_classes)
-    m.load_weights(model_path)
-    m.compile(loss='categorical_crossentropy',
-              optimizer= 'adadelta' ,
-              metrics=['accuracy'])
+    #m = SegMobileNet(input_height=new_shape[0], input_width=new_shape[1], num_classes=n_classes)
+    #m.load_weights(model_path)
+    #m.compile(loss='categorical_crossentropy',
+              #optimizer= 'adadelta' ,
+              #metrics=['accuracy'])
+
+    m = keras.models.load_model(model_path, custom_objects={
+                                               'relu6': mobilenet.relu6,
+                                               'DepthwiseConv2D': mobilenet.DepthwiseConv2D})
 
     #nw_output_shape = m.output[0].shape
     nw_output_shape = new_shape
@@ -88,15 +87,16 @@ if __name__ == '__main__':
         d = int(rgb_frame.shape[0] - int(output_height))
 
         frame_shape = rgb_frame.shape
-        X = preprocess_img(rgb_frame[d:,:,:])
+        #X = preprocess_img(rgb_frame[d:,:,:])
+        X = rgb_frame[d:,:,:]
 
         pr_out = m.predict( np.array([X]) )[0]
 
         pr[d:,:] = pr_out.reshape((output_height, output_width, n_classes)).argmax(axis=2)
         #pr = pr_out.reshape((output_height, output_width, n_classes)).argmax(axis=2)
         #pr = np.pad(pr, ((d,0), (0,0)), 'edge')
-        binary_car_result  = np.where((pr==1),1,0).astype('uint8')
-        binary_road_result = np.where((pr==2),1,0).astype('uint8')
+        binary_car_result  = np.where((pr==CAR_ID),1,0).astype('uint8')
+        binary_road_result = np.where((pr==ROAD_ID),1,0).astype('uint8')
 
         #binary_car_result  = np.where((pr_out[:,:,0]>0.5),1,0).astype('uint8')
         #binary_road_result = np.where((pr_out[:,:,1]>0.5),1,0).astype('uint8')
