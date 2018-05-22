@@ -14,7 +14,7 @@ import helper
 n_classes = 3
 input_width = 800
 input_height = 600
-visualize = True
+visualize = False
 enable_profiling = False
 image_shape = (input_height, input_width)
 
