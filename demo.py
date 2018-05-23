@@ -82,24 +82,19 @@ if __name__ == '__main__':
     start_t = time.time()
 
     pr = np.zeros((input_height, input_width))*2
+    #d = int(rgb_frame.shape[0] - int(output_height))
+    d = int(input_height - int(output_height))
 
     for rgb_frame in video:
-        d = int(rgb_frame.shape[0] - int(output_height))
-
-        frame_shape = rgb_frame.shape
         #X = preprocess_img(rgb_frame[d:,:,:])
-        X = rgb_frame[d:,:,:]
 
-        pr_out = m.predict( np.array([X]) )[0]
+        pr_out = m.predict( np.array([rgb_frame[d:,:,:]]) )[0]
 
         pr[d:,:] = pr_out.reshape((output_height, output_width, n_classes)).argmax(axis=2)
-        #pr = pr_out.reshape((output_height, output_width, n_classes)).argmax(axis=2)
-        #pr = np.pad(pr, ((d,0), (0,0)), 'edge')
+
         binary_car_result  = np.where((pr==CAR_ID),1,0).astype('uint8')
         binary_road_result = np.where((pr==ROAD_ID),1,0).astype('uint8')
 
-        #binary_car_result  = np.where((pr_out[:,:,0]>0.5),1,0).astype('uint8')
-        #binary_road_result = np.where((pr_out[:,:,1]>0.5),1,0).astype('uint8')
         answer_key[frame]  = [encode(binary_car_result), encode(binary_road_result)]
 
         if visualize:

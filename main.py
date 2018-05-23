@@ -22,7 +22,7 @@ use_ce_loss = False
 from common import *
 
 # Initialization; would be updated with actual value later
-new_shape = [600,800]
+new_shape = [input_height, input_width]
 
 # Check TensorFlow Version
 assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), \
@@ -260,10 +260,8 @@ def augmentation_fn(image, label, label2, label3):
 def run():
     from_scratch = False
     do_train = True
-    num_classes = 3
-    image_shape = (600, 800)
     learning_rate_val = 0.001
-    epochs = 10
+    epochs = 20
     decay = learning_rate_val / (2 * epochs)
     batch_size = 8
     data_dir = '/home/sagar/Lyft/CARLA_0.8.2/_out'
@@ -299,10 +297,10 @@ def run():
         learning_rate = tf.placeholder(tf.float32, name='learning_rate')
         correct_label = tf.placeholder(
             tf.float32,
-            shape=[None, new_shape[0], new_shape[1], num_classes],
+            shape=[None, new_shape[0], new_shape[1], n_classes],
             name='correct_label')
 
-        model = SegMobileNet(new_shape[0], new_shape[1], num_classes=num_classes)
+        model = SegMobileNet(new_shape[0], new_shape[1], num_classes=n_classes)
         # this initializes the keras variables
         sess = K.get_session()
         if not from_scratch:
@@ -313,7 +311,7 @@ def run():
         update_ops = model.updates
 
         logits, train_op, loss, iou, iou_op, metric_reset_ops = optimize(
-            logits, correct_label, learning_rate, num_classes)
+            logits, correct_label, learning_rate, n_classes)
 
         if do_train:
             print("N_train: %d\tN_val:%d\tTrain steps: %d\tVal_steps: %d"%(N_train, N_val, int(N_train/batch_size), int(N_val/batch_size)))
