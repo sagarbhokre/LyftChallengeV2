@@ -8,4 +8,4 @@ visualize = False
 enable_profiling = False
 image_shape = (input_height, input_width)
 
-model_path = 'checkpoint/ep-009-val_loss-0.4629.hdf5'#ep-029-val_loss-0.5531.hdf5'
+model_path = 'checkpoint/ep-009-val_loss-1.0125.hdf5' #ep-009-val_loss-0.4629.hdf5'

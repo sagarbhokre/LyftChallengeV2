@@ -3,6 +3,8 @@ data/*
 log/*
 dump/*
 ___/*
+GT_*.png
+cscope*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

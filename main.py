@@ -88,7 +88,7 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
         F_max = weights[1]*calc_fmax(beta_car) + weights[2]*calc_fmax(beta_road)
         ce_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=correct_label, logits=logits))
         #loss = (F_max - (weights[1]*F_car + weights[2]*F_road))
-        loss = (F_max - (weights[1]*F_car + weights[2]*F_road))
+        loss = ce_loss+(F_max - (weights[1]*F_car + weights[2]*F_road))
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
     # optimizer = tf.train.MomentumOptimizer(
