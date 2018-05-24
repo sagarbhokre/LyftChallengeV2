@@ -147,6 +147,16 @@ def gen_lyft_batches_functions(data_folder, image_shape, image_folder='image_2',
 
                 gt_image = np.concatenate((gt_bg, gt_car, gt_road), axis=2)
 
+                '''
+                image_l = scipy.misc.toimage(image)
+                arg_label = gt_image.argmax(axis=2)
+                img = blend_output(image_l, arg_label, (255,0,0), (0,255,0))
+                cv2.imshow("Out", np.array(img))
+                c = cv2.waitKey(0) & 0x7F
+                if c == 27 or c == ord('q'):
+                    exit()
+                '''
+
                 images.append(image)
                 gt_images.append(gt_image)
 

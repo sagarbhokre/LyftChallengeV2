@@ -91,9 +91,8 @@ def SegMobileNet(input_height, input_width, num_classes=21):
     x_up2 = Conv2DTranspose(64, (3,3), strides=(2, 2), padding='same', name='deconv_2')(x_s4)
     x_s2 = Add(name='add_s2')([x_up2, x_s2])
 
-    x = Conv2DTranspose(num_classes, (3,3), strides=(2, 2), padding='same', name='deconv_1')(x_s2)
+    x = Conv2DTranspose(num_classes, (3,3), strides=(2, 2), padding='same', activation='softmax', name='deconv_1')(x_s2)
 
-    x = Activation('softmax')(x)
     return Model(img_input, x, name='SegMobileNet')
 
 def _conv_bn_pred(x, stride, num_classes=21):

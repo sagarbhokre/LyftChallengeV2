@@ -88,7 +88,7 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
         F_max = weights[1]*calc_fmax(beta_car) + weights[2]*calc_fmax(beta_road)
         ce_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=correct_label, logits=logits))
         #loss = (F_max - (weights[1]*F_car + weights[2]*F_road))
-        loss = ce_loss+(F_max - (weights[1]*F_car + weights[2]*F_road))
+        loss = ce_loss + (F_max - (weights[1]*F_car + weights[2]*F_road))
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
     # optimizer = tf.train.MomentumOptimizer(
@@ -103,7 +103,7 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     metric_vars = [v for v in tf.local_variables()
                    if v.name.split('/')[0] == 'iou']
     metric_reset_ops = tf.variables_initializer(metric_vars)
-    return logits, train_op, loss, iou, iou_op, metric_reset_ops
+    return logits, train_op, loss, ce_loss, iou, iou_op, metric_reset_ops
 
 
 # tests.test_optimize(optimize)
@@ -115,7 +115,7 @@ def train_nn(
         batch_size,
         train_batches_fn, val_batches_fn,
         train_op,
-        cross_entropy_loss,
+        total_loss, cross_entropy_loss,
         input_image, correct_label,
         learning_rate, learning_rate_val, decay, learning_phase,
         iou_op, iou,
@@ -136,15 +136,19 @@ def train_nn(
     :param learning_rate: TF Placeholder for learning rate
     """
     train_loss_summary = tf.placeholder(tf.float32)
+    train_ce_loss_summary = tf.placeholder(tf.float32)
     val_loss_summary = tf.placeholder(tf.float32)
+    val_ce_loss_summary = tf.placeholder(tf.float32)
     train_iou_summary = tf.placeholder(tf.float32)
     val_iou_summary = tf.placeholder(tf.float32)
     seg_image_summary = tf.placeholder(tf.float32, [None, new_shape[0], new_shape[1], 3], name = "seg_img")
     inter_seg_image_summary = tf.placeholder(tf.float32, [None, new_shape[0], new_shape[1], 3], name = "inter_seg_img")
 
     tf.summary.scalar("train_loss", train_loss_summary)
+    tf.summary.scalar("train_ce_loss", train_ce_loss_summary)
     tf.summary.scalar("train_iou", train_iou_summary)
     tf.summary.scalar("val_loss", val_loss_summary)
+    tf.summary.scalar("val_ce_loss", val_ce_loss_summary)
     tf.summary.scalar("val_iou", val_iou_summary)
     tf.summary.scalar("learning_rate", learning_rate)
     tf.summary.image('input_img', input_image)
@@ -173,18 +177,20 @@ def train_nn(
     for epoch in epoch_pbar:
         # train
         train_loss = 0.0
+        train_ce_loss = 0.0
         iteration_counter = 0
         for image, label in train_batches_fn(batch_size):
-            fetches = [cross_entropy_loss, train_op, iou_op] + update_ops
+            fetches = [total_loss, cross_entropy_loss, train_op, iou_op] + update_ops
             feed_dict = {
                 input_image: image, correct_label: label,
                 learning_rate: learning_rate_val, learning_phase: KERAS_TRAIN,
             }
-            loss_val, *_ = sess.run(  # noqa
+            loss_val, ce_loss_val, *_ = sess.run(  # noqa
                 fetches,
                 feed_dict=feed_dict)
             # embed()
             train_loss += loss_val
+            train_ce_loss += ce_loss_val
             iteration_counter += 1
 
             if iteration_counter % 20 == 0:
@@ -200,6 +206,7 @@ def train_nn(
         learning_rate_val = learning_rate_val / (1.0 + decay * epoch)
         train_iou = sess.run(iou)
         train_loss /= iteration_counter
+        train_ce_loss /= iteration_counter
         val_loss = 0.0
         iteration_counter = 0
         sess.run(metric_reset_ops)
@@ -209,9 +216,10 @@ def train_nn(
                 input_image: image, correct_label: label,
                 learning_phase: KERAS_TEST,
             }
-            *_, loss_val = sess.run(
-                [iou_op, cross_entropy_loss], feed_dict=feed_dict)
+            *_, loss_val, ce_loss_val = sess.run(
+                [iou_op, total_loss, cross_entropy_loss], feed_dict=feed_dict)
             val_loss += loss_val
+            val_ce_loss += ce_loss_val
             iteration_counter += 1
 
         segmented_images = []
@@ -222,12 +230,15 @@ def train_nn(
 
         val_iou = sess.run(iou)
         val_loss /= iteration_counter
+        val_ce_loss /= iteration_counter
         epoch_pbar.write(
-            "Epoch %03d: loss: %.4f mIoU: %.4f val_loss: %.4f val_mIoU: %.4f"
-            % (epoch, train_loss, train_iou, val_loss, val_iou))
+            "Epoch %03d: loss: %.4f ce_loss: %.4f mIoU: %.4f val_loss: %.4f val_ce_loss: %.4f val_mIoU: %.4f"
+            % (epoch, train_loss, train_ce_loss, train_iou, val_loss, val_ce_loss, val_iou))
         summary_val = sess.run(
             summary, feed_dict={train_loss_summary: train_loss,
+                                train_ce_loss_summary: train_ce_loss,
                                 val_loss_summary: val_loss,
+                                val_ce_loss_summary: val_ce_loss,
                                 train_iou_summary: train_iou,
                                 val_iou_summary: val_iou,
                                 learning_rate: learning_rate_val,
@@ -261,7 +272,7 @@ def run():
     from_scratch = False
     do_train = True
     learning_rate_val = 0.001
-    epochs = 20
+    epochs = 10
     decay = learning_rate_val / (2 * epochs)
     batch_size = 8
     data_dir = '/home/sagar/Lyft/CARLA_0.8.2/_out'
@@ -310,14 +321,14 @@ def run():
         # https://blog.keras.io/keras-as-a-simplified-interface-to-tensorflow-tutorial.html  # noqa
         update_ops = model.updates
 
-        logits, train_op, loss, iou, iou_op, metric_reset_ops = optimize(
+        logits, train_op, loss, ce_loss, iou, iou_op, metric_reset_ops = optimize(
             logits, correct_label, learning_rate, n_classes)
 
         if do_train:
             print("N_train: %d\tN_val:%d\tTrain steps: %d\tVal_steps: %d"%(N_train, N_val, int(N_train/batch_size), int(N_val/batch_size)))
             train_nn(sess, epochs, batch_size,
                      train_batches_fn, val_batches_fn,
-                     train_op, loss, input_image,
+                     train_op, loss, ce_loss, input_image,
                      correct_label,
                      learning_rate, learning_rate_val, decay, learning_phase,
                      iou_op, iou, metric_reset_ops,
