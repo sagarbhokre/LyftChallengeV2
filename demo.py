@@ -39,7 +39,7 @@ save_count = 0
 def visualizeImage(rgb_frame, im_out, render=True):
     #im_out = im_out.reshape(rgb_frame.shape[0], rgb_frame.shape[1], 1)
     rgb_frame = scipy.misc.toimage(rgb_frame)
-    street_img = helper.blend_output(rgb_frame, im_out, (0,255,0), (255,0,0))
+    street_img = helper.blend_output(rgb_frame, im_out, (0,255,0), (255,0,0), image_shape)
 
     if render:
         global save_count
@@ -83,14 +83,14 @@ if __name__ == '__main__':
 
     pr = np.zeros((input_height, input_width))*2
     #d = int(rgb_frame.shape[0] - int(output_height))
-    d = int(input_height - int(output_height))
+    #d = int(input_height - int(output_height))
 
     for rgb_frame in video:
         #X = preprocess_img(rgb_frame[d:,:,:])
 
-        pr_out = m.predict( np.array([rgb_frame[d:,:,:]]) )[0]
+        pr_out = m.predict( np.array([rgb_frame[-nw_shape[0]:,:,:]]) )[0]
 
-        pr[d:,:] = pr_out.reshape((output_height, output_width, n_classes)).argmax(axis=2)
+        pr[-nw_shape[0]:,:] = pr_out.reshape((nw_shape[0], nw_shape[1], n_classes)).argmax(axis=2)
 
         binary_car_result  = np.where((pr==CAR_ID),1,0).astype('uint8')
         binary_road_result = np.where((pr==ROAD_ID),1,0).astype('uint8')

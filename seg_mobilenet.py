@@ -16,11 +16,10 @@ from keras.applications.mobilenet import _conv_block
 
 import tensorflow as tf
 
-
+alpha = 1.0
 def TruncatedMobileNet(input_height, input_width):
     assert input_height // 16 * 16 == input_height
     assert input_width // 16 * 16 == input_width
-    alpha = 1.0
     depth_multiplier = 1
     img_input = Input(shape=[input_height, input_width, 3], name='image_input')
     # s / 2
@@ -82,13 +81,13 @@ def SegMobileNet(input_height, input_width, num_classes=21):
     x = Upsample_s1(x_s2)
     '''
 
-    x_up8 = Conv2DTranspose(256, (3,3), strides=(2, 2), data_format='channels_last', padding='same', name='deconv_8')(x_s16)
+    x_up8 = Conv2DTranspose(int(256*alpha), (3,3), strides=(2, 2), data_format='channels_last', padding='same', name='deconv_8')(x_s16)
     x_s8 = Add(name='add_s8')([x_up8, x_s8])
 
-    x_up4 = Conv2DTranspose(128, (3,3), strides=(2, 2), padding='same', name='deconv_4')(x_s8)
+    x_up4 = Conv2DTranspose(int(128*alpha), (3,3), strides=(2, 2), padding='same', name='deconv_4')(x_s8)
     x_s4 = Add(name='add_s4')([x_up4, x_s4])
 
-    x_up2 = Conv2DTranspose(64, (3,3), strides=(2, 2), padding='same', name='deconv_2')(x_s4)
+    x_up2 = Conv2DTranspose(int(64*alpha), (3,3), strides=(2, 2), padding='same', name='deconv_2')(x_s4)
     x_s2 = Add(name='add_s2')([x_up2, x_s2])
 
     x = Conv2DTranspose(num_classes, (3,3), strides=(2, 2), padding='same', activation='softmax', name='deconv_1')(x_s2)

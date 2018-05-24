@@ -75,7 +75,7 @@ def maybe_download_mobilenet_weights(alpha_text='1_0', rows=224):
                            cache_subdir='models')
     return weight_path
 
-def gen_lyft_batches_functions(data_folder, image_shape, image_folder='image_2', label_folder='gt_image_2',
+def gen_lyft_batches_functions(data_folder, image_shape, nw_shape, image_folder='image_2', label_folder='gt_image_2',
                                train_augmentation_fn=None,
                                val_augmentation_fn=None):
     """
@@ -100,7 +100,7 @@ def gen_lyft_batches_functions(data_folder, image_shape, image_folder='image_2',
     #label_paths = {os.path.basename(path): path for path in label_fns}
     label_paths = {path: path for path in label_fns}
 
-    def get_batches_fn(batch_size, image_paths, augmentation_fn=None):
+    def get_batches_fn(batch_size, image_paths, augmentation_fn=None, im_size=None):
         """
         Create batches of training data
         :param batch_size: Batch Size
@@ -121,16 +121,16 @@ def gen_lyft_batches_functions(data_folder, image_shape, image_folder='image_2',
                 in_image = scipy.misc.imread(image_file, mode='RGB')
 
                 #image = scipy.misc.imresize(in_image, image_shape, interp='nearest')
-                image = in_image[-image_shape[0]:, :]
+                image = in_image[-im_size[0]:, :]
 
                 in_gt = scipy.misc.imread(gt_image_file)
 
                 #gt_image = scipy.misc.imresize(in_gt, image_shape, interp='nearest')[:,:,0]
-                gt_image = in_gt[-image_shape[0]:, :, 0]
+                gt_image = in_gt[-im_size[0]:, :, 0]
 
                 gt_road = ((gt_image == road_id) | (gt_image == lane_id))
                 gt_car = (gt_image == car_id)
-                gt_car[491:,:] = False
+                #gt_car[-101:,:] = False
                 gt_bg = np.invert(gt_car | gt_road)
 
                 if augmentation_fn:
@@ -150,7 +150,7 @@ def gen_lyft_batches_functions(data_folder, image_shape, image_folder='image_2',
                 '''
                 image_l = scipy.misc.toimage(image)
                 arg_label = gt_image.argmax(axis=2)
-                img = blend_output(image_l, arg_label, (255,0,0), (0,255,0))
+                img = blend_output(image_l, arg_label, (255,0,0), (0,255,0), nw_shape)
                 cv2.imshow("Out", np.array(img))
                 c = cv2.waitKey(0) & 0x7F
                 if c == 27 or c == ord('q'):
@@ -163,8 +163,8 @@ def gen_lyft_batches_functions(data_folder, image_shape, image_folder='image_2',
             #yield np.array(images) / 127.5 - 1.0, np.array(gt_images)
             yield np.array(images), np.array(gt_images)
 
-    train_batches_fn = lambda batch_size: get_batches_fn(batch_size, train_paths, augmentation_fn=train_augmentation_fn)  # noqa
-    val_batches_fn = lambda batch_size: get_batches_fn(batch_size, val_paths, augmentation_fn=val_augmentation_fn)  # noqa
+    train_batches_fn = lambda batch_size: get_batches_fn(batch_size, train_paths, augmentation_fn=train_augmentation_fn, im_size=nw_shape)  # noqa
+    val_batches_fn = lambda batch_size: get_batches_fn(batch_size, val_paths, augmentation_fn=val_augmentation_fn, im_size=image_shape)  # noqa
 
     return train_batches_fn, val_batches_fn, len(train_paths), len(val_paths)
 
@@ -227,15 +227,14 @@ def gen_batches_functions(data_folder, image_shape, image_folder='image_2', labe
     return train_batches_fn, val_batches_fn
 
 
-def blend_output(frame, im_out, c, r):
-    image_shape = frame.size
+def blend_output(frame, im_out, c, r, image_shape):
 
     #car_segmentation = (im_softmax[:,:,0] > 0.5).reshape(image_shape[0],image_shape[1],1)
-    car_segmentation = np.where((im_out==CAR_ID),1,0).astype('uint8').reshape(image_shape[1],image_shape[0],1)
+    car_segmentation = np.where((im_out==CAR_ID),1,0).astype('uint8').reshape(image_shape[0],image_shape[1],1)
     car_mask = np.dot(car_segmentation, np.array([[c[0], c[1], c[2], 127]]))
     car_mask = scipy.misc.toimage(car_mask, mode="RGBA")
 
-    road_segmentation = np.where((im_out==ROAD_ID),1,0).astype('uint8').reshape(image_shape[1],image_shape[0],1)
+    road_segmentation = np.where((im_out==ROAD_ID),1,0).astype('uint8').reshape(image_shape[0],image_shape[1],1)
     road_mask = np.dot(road_segmentation, np.array([[r[0], r[1], r[2], 127]]))
     road_mask = scipy.misc.toimage(road_mask, mode="RGBA")
 
@@ -251,21 +250,19 @@ def blend_output(frame, im_out, c, r):
     return street_im
 
 
-def get_seg_img(sess, logits, image_pl, pimg_in, image_shape, learning_phase):
+def get_seg_img(sess, logits, image_pl, pimg_in, image_shape, nw_shape, learning_phase):
+    im_out = np.zeros(image_shape)
 
-    new_shape = [x // 16 * 16 for x in image_shape]
-    d = image_shape[0] - new_shape[0]
-
-    pimg = pimg_in[d:,:,:]
+    pimg = pimg_in[-nw_shape[0]:,:,:]
     im_softmax = sess.run(tf.nn.softmax(logits), {image_pl: [pimg], learning_phase: 0})
 
-    im_softmax = im_softmax.reshape(new_shape[0], new_shape[1], -1)
-    im_out = im_softmax.argmax(axis=2)
+    im_softmax = im_softmax.reshape(nw_shape[0], nw_shape[1], -1)
+    im_out[-nw_shape[0]:,:] = im_softmax.argmax(axis=2)
 
     image = (pimg_in + 1.0) * 127.5
     image = scipy.misc.toimage(image)
 
-    return blend_output(image, im_out, (0,255,0), (0,0,0))
+    return blend_output(image, im_out, (0,255,0), (0,0,0), image_shape)
 
 def gen_lyft_test_output(
         sess,
@@ -274,7 +271,7 @@ def gen_lyft_test_output(
         image_pl,
         data_folder,
         learning_phase,
-        image_shape):
+        image_shape, nw_shape):
     """
     Generate test output using the test images
     :param sess: TF session
@@ -294,7 +291,7 @@ def gen_lyft_test_output(
 
         pimg = image / 127.5 - 1.0
 
-        street_im = get_seg_img(sess, logits, image_pl, pimg, image_shape, learning_phase)
+        street_im = get_seg_img(sess, logits, image_pl, pimg, image_shape, nw_shape, learning_phase)
 
         street_im = scipy.misc.imresize(street_im, in_image.shape)
         yield os.path.basename(image_file), np.array(street_im)
@@ -367,6 +364,7 @@ def lyft_save_inference_samples(
         image_folder,
         sess,
         image_shape,
+        nw_shape,
         logits,
         learning_phase,
         input_image):
@@ -380,6 +378,6 @@ def lyft_save_inference_samples(
     print('Training Finished. Saving test images to: {}'.format(output_dir))
     image_outputs = gen_lyft_test_output(
         sess, logits, image_folder, input_image, os.path.join(
-            data_dir, 'Test'), learning_phase, image_shape)
+            data_dir, 'Test'), learning_phase, image_shape, nw_shape)
     for name, image in image_outputs:
         scipy.misc.imsave(os.path.join(output_dir, name), image)
