@@ -130,7 +130,7 @@ def gen_lyft_batches_functions(data_folder, image_shape, nw_shape, image_folder=
 
                 gt_road = ((gt_image == road_id) | (gt_image == lane_id))
                 gt_car = (gt_image == car_id)
-                #gt_car[-101:,:] = False
+                gt_car[-104:,:] = False
                 gt_bg = np.invert(gt_car | gt_road)
 
                 if augmentation_fn:
