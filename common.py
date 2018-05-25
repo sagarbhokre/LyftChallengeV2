@@ -14,4 +14,4 @@ nw_shape = (nw_height, nw_width)
 visualize = False
 enable_profiling = False
 
-model_path = 'checkpoint/ep-007-val_loss-1.0023.hdf5'
+model_path = 'checkpoint/ep-009-val_loss-1.2636.hdf5'
