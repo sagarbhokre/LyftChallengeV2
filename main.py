@@ -88,8 +88,8 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
         loss = ce_loss + (F_max - (weights[1]*F_car + weights[2]*F_road))
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-    # optimizer = tf.train.MomentumOptimizer(
-    #     learning_rate=learning_rate, momentum=0.9)
+    #optimizer = tf.train.AdagradOptimizer(learning_rate=learning_rate)
+    #optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
     train_op = optimizer.minimize(loss)
 
     predicted_label = tf.argmax(logits, axis=-1)
@@ -321,7 +321,7 @@ def run():
             logits, correct_label, learning_rate, n_classes)
 
         if do_train:
-            print("N_train: %d\tN_val:%d\tTrain steps: %d\tVal_steps: %d"%(N_train, N_val, int(N_train/batch_size), int(N_val/batch_size)))
+            print("N_train: %d\tN_val:%d\tTrain steps: %d\tVal_steps: %d\tBatch size: %d"%(N_train, N_val, int(N_train/batch_size), int(N_val/batch_size), batch_size))
             train_nn(sess, epochs, batch_size,
                      train_batches_fn, val_batches_fn,
                      train_op, loss, ce_loss, input_image,
