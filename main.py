@@ -138,7 +138,7 @@ def train_nn(
     val_ce_loss_summary = tf.placeholder(tf.float32)
     train_iou_summary = tf.placeholder(tf.float32)
     val_iou_summary = tf.placeholder(tf.float32)
-    seg_image_summary = tf.placeholder(tf.float32, [None, image_shape[0], image_shape[1], 3], name = "seg_img")
+    seg_image_summary = tf.placeholder(tf.float32, [None, nw_shape[0], nw_shape[1], 3], name = "seg_img")
     inter_seg_image_summary = tf.placeholder(tf.float32, [None, nw_shape[0], nw_shape[1], 3], name = "inter_seg_img")
 
     tf.summary.scalar("train_loss", train_loss_summary)
@@ -196,7 +196,7 @@ def train_nn(
                     img1 = helper.get_seg_img(sess, model.output, input_image, image[i], image_shape=nw_shape,
                                               nw_shape=nw_shape, learning_phase=learning_phase)
                     arg_label = label[i].argmax(axis=2)
-                    img2 = helper.blend_output(img1, arg_label, (255, 165, 0), (255,255,255), nw_shape)
+                    img2 = helper.blend_output(img1, arg_label, (255, 5, 0), (5,5,5), nw_shape)
                     segmented_images.append(np.array(img2))
                 summary_val = sess.run(inter_seg_summary, feed_dict={inter_seg_image_summary: segmented_images})
                 writer.add_summary(summary_val, int(iteration_counter))
@@ -224,7 +224,7 @@ def train_nn(
         segmented_images = []
         for i in range(len(image)):
             segmented_images.append(np.array(helper.get_seg_img(sess, model.output, input_image, image[i],
-                                                                image_shape=image_shape, nw_shape=nw_shape,
+                                                                image_shape=nw_shape, nw_shape=nw_shape,
                                                                 learning_phase=learning_phase)))
 
         val_iou = sess.run(iou)
@@ -241,9 +241,9 @@ def train_nn(
                                 train_iou_summary: train_iou,
                                 val_iou_summary: val_iou,
                                 learning_rate: learning_rate_val,
-                                input_image: image[:,-nw_shape[0]:,:],
+                                input_image: image,
                                 seg_image_summary: np.array(segmented_images),
-                                inter_seg_image_summary: np.array(segmented_images)[:,-nw_shape[0]:,:]})
+                                inter_seg_image_summary: np.array(segmented_images)})
 
         writer.add_summary(summary_val, epoch)
         if epoch % 1 == 0:

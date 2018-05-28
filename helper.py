@@ -87,7 +87,7 @@ def gen_lyft_batches_functions(data_folder, image_shape, nw_shape, image_folder=
     image_paths = []
     label_fns = []
 
-    data_folders = glob(data_folder+"/*/")
+    data_folders = glob(data_folder+"/_*/")
 
     for data_folder in data_folders:
         image_paths.extend(sorted(glob(os.path.join(data_folder, image_folder, '*.png')))[:])
@@ -121,16 +121,16 @@ def gen_lyft_batches_functions(data_folder, image_shape, nw_shape, image_folder=
                 in_image = scipy.misc.imread(image_file, mode='RGB')
 
                 #image = scipy.misc.imresize(in_image, image_shape, interp='nearest')
-                image = in_image[-im_size[0]:, :]
+                image = in_image[OFFSET_HIGH:OFFSET_LOW, :]
 
                 in_gt = scipy.misc.imread(gt_image_file)
 
                 #gt_image = scipy.misc.imresize(in_gt, image_shape, interp='nearest')[:,:,0]
-                gt_image = in_gt[-im_size[0]:, :, 0]
+                gt_image = in_gt[OFFSET_HIGH:OFFSET_LOW, :, 0]
 
                 gt_road = ((gt_image == road_id) | (gt_image == lane_id))
                 gt_car = (gt_image == car_id)
-                gt_car[-104:,:] = False
+                #gt_car[-104:,:] = False
                 gt_bg = np.invert(gt_car | gt_road)
 
                 if augmentation_fn:
@@ -253,16 +253,18 @@ def blend_output(frame, im_out, c, r, image_shape):
 def get_seg_img(sess, logits, image_pl, pimg_in, image_shape, nw_shape, learning_phase):
     im_out = np.zeros(image_shape)
 
-    pimg = pimg_in[-nw_shape[0]:,:,:]
+    #pimg = pimg_in[OFFSET_HIGH:OFFSET_LOW,:,:]
+    pimg = pimg_in
     im_softmax = sess.run(tf.nn.softmax(logits), {image_pl: [pimg], learning_phase: 0})
 
     im_softmax = im_softmax.reshape(nw_shape[0], nw_shape[1], -1)
-    im_out[-nw_shape[0]:,:] = im_softmax.argmax(axis=2)
+    #im_out[OFFSET_HIGH:OFFSET_LOW,:] = im_softmax.argmax(axis=2)
+    im_out = im_softmax.argmax(axis=2)
 
     image = (pimg_in + 1.0) * 127.5
     image = scipy.misc.toimage(image)
 
-    return blend_output(image, im_out, (0,255,0), (0,0,0), image_shape)
+    return blend_output(image, im_out, (0,255,0), (250,250,250), image_shape)
 
 def gen_lyft_test_output(
         sess,
