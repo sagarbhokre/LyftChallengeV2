@@ -23,10 +23,11 @@ def load_seg_model():
               #optimizer= 'adadelta' ,
               #metrics=['accuracy'])
 
-    m = keras.models.load_model(model_path, custom_objects={
+    m = keras.models.load_model(model_path, compile=False, custom_objects={
                                                'relu6': mobilenet.relu6,
                                                'DepthwiseConv2D': mobilenet.DepthwiseConv2D})
 
+    m = m.layers[1]
     #nw_output_shape = m.output[0].shape
     nw_output_shape = new_shape
 
@@ -44,6 +45,7 @@ def visualizeImage(rgb_frame, im_out, render=True):
     if render:
         global save_count
         #scipy.misc.imshow(street_img)
+        #scipy.misc.imsave('dump/'+str(save_count)+'_img.png', scipy.misc.toimage(np.array(street_img)[OFFSET_HIGH:OFFSET_LOW,:]))
         scipy.misc.imsave('dump/'+str(save_count)+'.png', street_img)
         save_count += 1
         #c = cv2.waitKey(30) & 0x7F
