@@ -17,4 +17,4 @@ OFFSET_LOW=OFFSET_HIGH+nw_height
 visualize = False
 enable_profiling = False
 
-model_path = 'checkpoint/ep-016-val_loss-0.9948.hdf5'
+model_path = 'checkpoint/ep-017-val_loss-0.9944.hdf5'
