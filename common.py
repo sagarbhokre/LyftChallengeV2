@@ -17,4 +17,4 @@ OFFSET_LOW=OFFSET_HIGH+nw_height
 visualize = False
 enable_profiling = False
 
-model_path = 'checkpoint/ep-005-val_loss-0.9930.hdf5'
+model_path = 'checkpoint/SegMobileNet_001.hdf5'

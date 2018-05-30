@@ -27,8 +27,8 @@ def load_seg_model():
                                                'relu6': mobilenet.relu6,
                                                'DepthwiseConv2D': mobilenet.DepthwiseConv2D})
 
-    if 'SegMobileNet' in model_path:
-        m = m.layers[1]
+    #if 'SegMobileNet' in model_path:
+        #m = m.layers[1]
     #nw_output_shape = m.output[0].shape
     nw_output_shape = new_shape
 
