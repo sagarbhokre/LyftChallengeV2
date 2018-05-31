@@ -2,6 +2,7 @@ runs/*
 data/*
 log/*
 dump/*
+Example/*
 ___/*
 GT_*.png
 cscope*

@@ -1,3 +1,6 @@
+#visualize = True
+visualize = False
+
 BG_ID = 0
 CAR_ID = 1
 ROAD_ID = 2
@@ -14,7 +17,6 @@ nw_shape = (nw_height, nw_width)
 OFFSET_HIGH=190
 OFFSET_LOW=OFFSET_HIGH+nw_height
 
-visualize = False
 enable_profiling = False
 
-model_path = 'checkpoint/ep-019-val_loss-0.9903.hdf5'
+model_path = 'checkpoint/SegMobileNet_007.hdf5' #ep-019-val_loss-0.9903.hdf5'

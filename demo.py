@@ -38,20 +38,26 @@ def load_seg_model():
     return m, output_width, output_height
 
 save_count = 0
+videoout = None
 def visualizeImage(rgb_frame, im_out, render=True):
     #im_out = im_out.reshape(rgb_frame.shape[0], rgb_frame.shape[1], 1)
     rgb_frame = scipy.misc.toimage(rgb_frame)
     street_img = helper.blend_output(rgb_frame, im_out, (0,255,0), (255,0,0), image_shape)
 
     if render:
-        global save_count
-        #scipy.misc.imshow(street_img)
-        #scipy.misc.imsave('dump/'+str(save_count)+'_img.png', scipy.misc.toimage(np.array(street_img)[OFFSET_HIGH:OFFSET_LOW,:]))
-        scipy.misc.imsave('dump/'+str(save_count)+'.png', street_img)
+        global save_count, videoout
+
+        if save_count == 0:
+            fourcc = cv2.VideoWriter_fourcc(*'XVID')
+            #fourcc = cv2.cv.CV_FOURCC(*'XVID')
+            videoout = cv2.VideoWriter('dump/output.avi',fourcc, 30.0, (input_width, input_height))
+
+        if videoout is not None:
+            videoout.write(np.asarray(street_img))
+
+        #scipy.misc.imsave('dump/'+str(save_count)+'.png', street_img)
         save_count += 1
-        #c = cv2.waitKey(30) & 0x7F
-        #if c == ord('q') or c == 27:
-            #exit() 
+        #videoout.release()
 
 def preprocess_img(img, ordering='channels_first'):
     #in_image = scipy.misc.imread(image_file, mode='RGB')
