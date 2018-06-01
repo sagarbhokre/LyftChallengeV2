@@ -53,7 +53,7 @@ def visualizeImage(rgb_frame, im_out, render=True):
             videoout = cv2.VideoWriter('dump/output.avi',fourcc, 30.0, (input_width, input_height))
 
         if videoout is not None:
-            videoout.write(np.asarray(street_img))
+            videoout.write(cv2.cvtColor(np.asarray(street_img), cv2.COLOR_RGB2BGR))
 
         #scipy.misc.imsave('dump/'+str(save_count)+'.png', street_img)
         save_count += 1
@@ -90,13 +90,9 @@ if __name__ == '__main__':
 
     start_t = time.time()
 
-    pr = np.zeros((input_height, input_width))*2
-    #d = int(rgb_frame.shape[0] - int(output_height))
-    #d = int(input_height - int(output_height))
+    pr = np.zeros((input_height, input_width))
 
     for rgb_frame in video:
-        #X = preprocess_img(rgb_frame[d:,:,:])
-
         pr_out = m.predict( np.array([rgb_frame[OFFSET_HIGH:OFFSET_LOW,:,:]]) )[0]
 
         pr[OFFSET_HIGH:OFFSET_LOW,:] = pr_out.reshape((nw_shape[0], nw_shape[1], n_classes)).argmax(axis=2)
