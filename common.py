@@ -1,3 +1,5 @@
+model_path = 'checkpoint/SegMobileNet_015.hdf5'
+
 #visualize = True
 visualize = False
 
@@ -24,5 +26,3 @@ OFFSET_HIGH=94
 OFFSET_LOW=OFFSET_HIGH + nw_height #(526)
 
 enable_profiling = False
-
-model_path = 'checkpoint/SegMobileNet_009.hdf5'
