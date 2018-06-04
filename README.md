@@ -1,7 +1,7 @@
 # LyftChallengeV2 - Semantic Segmentation
 
 ### Overview
-Implementation tries to address semantic segmentation requirement for Lyft Challenge with Udacity. It uses [MobileNet](https://arxiv.org/abs/1704.04861) architecture. All stride-16 depthwise convolutions were replaced with dilated depthwise convolutions and the two final stride-32 layers were removed. This is similar to what was done in [Multi-Scale Context Aggregation by Dilated Convolutions](https://arxiv.org/abs/1511.07122). It also contains skip-connections for stride-8 and stride-4 (adding stride-2 gave no better results).
+Implementation tries to address semantic segmentation requirement for Lyft Challenge with Udacity. It uses [MobileNet](https://arxiv.org/abs/1704.04861) architecture. All stride-16 depthwise convolutions were replaced with dilated depthwise convolutions and the two final stride-32 layers were removed. This is similar to what was done in [Multi-Scale Context Aggregation by Dilated Convolutions](https://arxiv.org/abs/1511.07122). It also contains skip-connections for stride-8 and stride-4.
 The model uses the [Keras MobileNet implementation](https://github.com/fchollet/keras/blob/master/keras/applications/mobilenet.py) and training is done with [TensorFlow](https://www.tensorflow.org/).
 
 ### Preparing the data for training
@@ -12,15 +12,34 @@ tar -xvzf dataset.tar.gz
 
 Train/Validation split: 90 % / 10 %
 
-Original dataset used for training [Not used for the challenge]:
-
-[Kitti Road dataset](http://www.cvlibs.net/datasets/kitti/eval_road.php) with 90% / 10% training/validation data split. Images are downscaled to half resolution.
 
 [//]: # (Image References)
-[image1]: ./res/loss_curves.png
-[image2]: ./res/augmentation_methods_overview.png
+[image1]: ./res/loss_graph.png
+[image2]: ./res/augmentation.png
 [image3]: ./res/latest_run.png
 [image4]: ./res/benchmark_results.png
+[image5]: ./res/model.png
+
+#### Data visualization
+Use the following script to visualize the data. The data is expected to be in following folders
+_data_folder_
+ |__ CameraRGB
+ | |_ 1.png
+ | |_ 2.png
+ | |_:
+ | |_:
+ |
+ |__ CameraSeg
+   |_ 1.png
+   |_ 2.png
+   |_ :
+   |_ :
+
+python3 visualize_data.py <_data_folder_>
+
+Similarly video file along with corresponding json ground truth can be visualized as follows:
+
+python3 visualize_combined.py <_video_file_> <_json_file_>
 
 #### Data augmentation
 The dataset is rather small i.e. only 1000 training images. A few augmentation methods include: rotation, flipping, blurring and changing the illumination of the scene (see `augmentation.py`).
@@ -91,8 +110,6 @@ Make sure you have the following is installed:
  - [OpenCV](https://opencv.org/)
 
 ##### Dataset
-[Not used for the challenge] Download the [Kitti Road dataset](http://www.cvlibs.net/datasets/kitti/eval_road.php) from [here](http://www.cvlibs.net/download.php?file=data_road.zip).  Extract the dataset in the `data` folder.  This will create the folder `data_road` with all the training and test images.
-
 Please refer to "Preparing the data for training" for more details.
 
 ### Start

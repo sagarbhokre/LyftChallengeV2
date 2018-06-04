@@ -87,7 +87,8 @@ def gen_lyft_batches_functions(data_folder, image_shape, nw_shape, image_folder=
     image_paths = []
     label_fns = []
 
-    data_folders = glob(data_folder+"/_*/")
+    data_folders = []
+    data_folders.extend(glob(data_folder+"/Train*/"))
 
     for data_folder in data_folders:
         image_paths.extend(sorted(glob(os.path.join(data_folder, image_folder, '*.png')))[:])
@@ -111,6 +112,11 @@ def gen_lyft_batches_functions(data_folder, image_shape, nw_shape, image_folder=
         road_id = 7
         lane_id = 6
         car_id = 10
+
+        b1 = input_height - OFFSET_LOW
+        x1 = input_height - HOOD_OFFSET
+        x2 = x1 - b1
+
         random.shuffle(image_paths)
         for batch_i in range(0, len(image_paths), batch_size):
             images = []
@@ -130,13 +136,16 @@ def gen_lyft_batches_functions(data_folder, image_shape, nw_shape, image_folder=
 
                 gt_road = ((gt_image == road_id) | (gt_image == lane_id))
                 gt_car = (gt_image == car_id)
-                #gt_car[-104:,:] = False
+
+                if x2 > 0:
+                    gt_car[-x2:,:] = False
+
                 gt_bg = np.invert(gt_car | gt_road)
 
                 if augmentation_fn:
                     image, gt_bg, gt_car, gt_road = augmentation_fn(image, gt_bg, gt_car, gt_road)
 
-                if len(images) == 0:
+                if False and len(images) == 0:
                     cv2.imwrite("GT_car_img.png", 255*gt_car)
                     cv2.imwrite("GT_road_img.png", 255*gt_road)
                     cv2.imwrite("GT_bg_img.png", 255*gt_bg)
@@ -264,7 +273,7 @@ def get_seg_img(sess, logits, image_pl, pimg_in, image_shape, nw_shape, learning
     image = (pimg_in + 1.0) * 127.5
     image = scipy.misc.toimage(image)
 
-    return blend_output(image, im_out, (0,255,0), (250,250,250), image_shape)
+    return blend_output(image, im_out, (0,255,0), (250,0,0), image_shape)
 
 def gen_lyft_test_output(
         sess,

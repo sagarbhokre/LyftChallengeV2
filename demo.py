@@ -93,12 +93,14 @@ if __name__ == '__main__':
     pr = np.zeros((input_height, input_width))
 
     for rgb_frame in video:
+
         pr_out = m.predict( np.array([rgb_frame[OFFSET_HIGH:OFFSET_LOW,:,:]]) )[0]
 
         pr[OFFSET_HIGH:OFFSET_LOW,:] = pr_out.reshape((nw_shape[0], nw_shape[1], n_classes)).argmax(axis=2)
 
         binary_car_result  = np.where((pr==CAR_ID),1,0).astype('uint8')
         binary_road_result = np.where((pr==ROAD_ID),1,0).astype('uint8')
+        binary_car_result[496:,:]=0
 
         answer_key[frame]  = [encode(binary_car_result), encode(binary_road_result)]
 

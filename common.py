@@ -1,4 +1,4 @@
-model_path = 'checkpoint/SegMobileNet_015.hdf5'
+model_path = 'checkpoint/SegMobileNet_001.hdf5'
 
 #visualize = True
 visualize = False

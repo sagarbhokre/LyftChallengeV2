@@ -1,5 +1,5 @@
 import os.path
-import os
+import os, sys
 import shutil
 import tensorflow as tf
 from keras import backend as K
@@ -59,14 +59,27 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     if use_ce_loss:
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=correct_label, logits=logits))
     else:
-        logits_c = tf.unstack(logits, axis=1)
-        correct_label_c = tf.unstack(correct_label, axis=1)
-        loss = 0
+        ce_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=correct_label, logits=logits))
+        weights = [0.0, 0.5, 0.5] # Background, Car, Road
+
+        inter=tf.reduce_sum(tf.multiply(logits,correct_label), axis=0)
+        union=tf.reduce_sum(tf.subtract(tf.add(logits,correct_label),tf.multiply(logits,correct_label)), axis=0)
+        precision = tf.divide(inter, tf.reduce_sum(logits, axis=0))
+        recall = tf.divide(inter, tf.reduce_sum(correct_label, axis=0))
+        beta = tf.constant([0.0, 2.0, 0.5])
+        beta2 = tf.square(beta)
+
+        F = ( 1 + beta2) * precision * recall / (epsilon + (beta2 * precision) + recall)
+
+        F_loss =  1.0 - tf.reduce_sum(weights * F)
+
+        '''
         beta_car = 2.0
         beta_road = 0.5
-        weights = [0.0, 0.7, 0.3] # Background, Car, Road
         F_car = 0
         F_road = 0
+        logits_c = tf.unstack(logits, axis=1)
+        correct_label_c = tf.unstack(correct_label, axis=1)
         for i in range(num_classes):
             # Ignore background
             if i == BG_ID:
@@ -80,13 +93,12 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
                 F_car = calc_f(beta_car, precision,recall)
             if i == ROAD_ID:
                 F_road = calc_f(beta_road, precision,recall)
-            #loss+=weights[i]*tf.subtract(tf.constant(1.0, dtype=tf.float32),tf.divide(inter,union))
-        #loss=tf.subtract(tf.constant(1.0, dtype=tf.float32),(F_car + F_road))
-        F_max = weights[1]*calc_fmax(beta_car) + weights[2]*calc_fmax(beta_road)
-        ce_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=correct_label, logits=logits))
-        #loss = (F_max - (weights[1]*F_car + weights[2]*F_road))
-        loss = ce_loss + (F_max - (weights[1]*F_car + weights[2]*F_road))
 
+        F_max = weights[1]*calc_fmax(beta_car) + weights[2]*calc_fmax(beta_road)
+
+        loss = ce_loss + (F_max - (weights[1]*F_car + weights[2]*F_road))
+        '''
+        loss = ce_loss + F_loss
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
     #optimizer = tf.train.AdagradOptimizer(learning_rate=learning_rate)
     #optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
@@ -102,10 +114,7 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     metric_reset_ops = tf.variables_initializer(metric_vars)
     return logits, train_op, loss, ce_loss, iou, iou_op, metric_reset_ops
 
-
 # tests.test_optimize(optimize)
-
-
 def train_nn(
         sess,
         epochs,
@@ -196,7 +205,7 @@ def train_nn(
                     img1 = helper.get_seg_img(sess, model.output, input_image, image[i], image_shape=nw_shape,
                                               nw_shape=nw_shape, learning_phase=learning_phase)
                     arg_label = label[i].argmax(axis=2)
-                    img2 = helper.blend_output(img1, arg_label, (255, 5, 0), (5,5,5), nw_shape)
+                    img2 = helper.blend_output(img1, arg_label, (5, 5, 250), (255,255,255), nw_shape)
                     segmented_images.append(np.array(img2))
                 summary_val = sess.run(inter_seg_summary, feed_dict={inter_seg_image_summary: segmented_images})
                 writer.add_summary(summary_val, int(iteration_counter))
@@ -247,8 +256,8 @@ def train_nn(
 
         writer.add_summary(summary_val, epoch)
         if epoch % 1 == 0:
-            weight_path = 'checkpoint/ep-%03d-val_loss-%.4f.hdf5' \
-                          % (epoch, val_loss)
+            weight_path = 'checkpoint/ep-%03d-val_iou-%.4f.hdf5' \
+                          % (epoch, val_iou)
             model.save(weight_path)
 
 
@@ -267,20 +276,24 @@ def augmentation_fn(image, label, label2, label3):
 
 
 # tests.test_train_nn(train_nn)
-def run():
+def run(pretrained_model=None):
     from_scratch = False
     do_train = True
     learning_rate_val = 0.001
-    epochs = 10
+    epochs = 45
     decay = learning_rate_val / (2 * epochs)
     batch_size = 8
-    data_dir = '/home/sagar/Lyft/CARLA_0.8.2/_out'
+    data_dir = '/raid/sagar/Lyft/CARLA_0.8.2/_out'
     runs_dir = './runs'
     #tests.test_for_kitti_dataset('./data')
     # OPTIONAL: Train and Inference on the cityscapes dataset instead of the
     # You'll need a GPU with at least 10 teraFLOPS to train on.
     #  https://www.cityscapes-dataset.com/
-    if not from_scratch:
+    if pretrained_model is not None:
+        print("Training from pretrained local weights")
+        weight_path = pretrained_model
+    elif not from_scratch:
+        print("Training from pretrained Mobilenet weights")
         weight_path = helper.maybe_download_mobilenet_weights()
 
     if not os.path.exists('checkpoint'):
@@ -340,4 +353,8 @@ def run():
 
 
 if __name__ == '__main__':
-    run()
+    pretrained_model = None
+    if len(sys.argv) == 2:
+        pretrained_model = sys.argv[1]
+
+    run(pretrained_model)
